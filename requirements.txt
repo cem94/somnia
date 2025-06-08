@@ -1,0 +1,16 @@
+# Core dependencies
+torch>=2.0.0
+transformers>=4.30.0
+numpy>=1.24.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+
+# Text processing
+tokenizers>=0.13.0
+natsort>=8.3.0
+
+# Data management
+kaggle>=1.5.0
+
+# Logging and utilities
+tqdm>=4.65.0
