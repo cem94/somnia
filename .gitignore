@@ -82,5 +82,8 @@ model/hyperparameters/
 # Kaggle credential
 kaggle_credential/
 
+# Export functionality
+export_device/android_model
+
 # DS_Store
 .DS_Store

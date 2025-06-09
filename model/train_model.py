@@ -100,7 +100,7 @@ def load_checkpoint_if_exists(model: SomniaTransformer, optimizer: optim.Optimiz
 def save_checkpoint_and_plots(model: SomniaTransformer, optimizer: optim.Optimizer, 
                             metrics: MetricsTracker, config: LLamaConfig, 
                             epoch: int, step: int, loss: float, 
-                            checkpoint_name: str = "checkpoint.pt") -> None:
+                            checkpoint_name: str = "llama_model.pt") -> None:
     """
     Save model checkpoint and training plots.
     

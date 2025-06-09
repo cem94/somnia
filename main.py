@@ -6,6 +6,7 @@ Pipeline stages:
 1. Data Processing: Fetch raw data, prepare datasets, and perform analysis
 2. Tokenizer Training: Train custom tokenizer on processed data
 3. Model Training: Train the main Somnia model using prepared data and tokenizer
+4. Model Export: Export the trained model for deployment on target devices
 """
 
 import time
@@ -14,6 +15,7 @@ from data.analysis import analysis
 from data.processed import prepare_dataset
 from model.train_tokenizer import main as train_tokenizer_main
 from model.hyperparameter import main as train_model_main
+from export_device.export_model import main as export_model_main
 from utility.logger import LOGGER
 
 
@@ -73,6 +75,20 @@ def train_model():
     duration = time.time() - start_time
     LOGGER.info(f"Model training completed in {duration:.2f} seconds")
 
+def export_model():
+    """
+    Export the trained Somnia model.
+    
+    This function handles the model export process, preparing it
+    for deployment or inference on target devices.
+    """
+    start_time = time.time()
+    LOGGER.info("Starting model exporting")
+    
+    export_model_main()
+    
+    duration = time.time() - start_time
+    LOGGER.info(f"Model exporting completed in {duration:.2f} seconds")
 
 def main():
     """
@@ -88,6 +104,7 @@ def main():
     data_processing()
     train_tokenizer()
     train_model()
+    export_model()
     
     total_duration = time.time() - pipeline_start
     LOGGER.info(f"Somnia execution completed in {total_duration:.2f} seconds")

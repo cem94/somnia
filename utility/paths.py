@@ -60,3 +60,7 @@ PROCESSED_OUTPUT_FILE = os.path.join(PROCESSED_DATA_DIR, "training_data.jsonl")
 # External configuration paths
 KAGGLE_DIR = os.path.expanduser("~/.kaggle")
 KAGGLE_CONFIG_FILE = os.path.join(KAGGLE_DIR, "kaggle.json")
+
+# Export model paths
+EXPORT_MODEL_DIR = os.path.join(PROJECT_ROOT, "export_device")
+EXPORT_OUTPUT_DIR = os.path.join(EXPORT_MODEL_DIR, "android_model")

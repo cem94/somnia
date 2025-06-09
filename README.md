@@ -20,7 +20,12 @@ This repository contains the full pipeline for data preparation, custom tokenize
 │   ├── fetch/           # Scripts to download data from Kaggle
 │   ├── processed/       # Scripts to prepare data for training
 │   └── analysis/        # Data analysis and visualization
+├── export_device/
+│   ├── export_model.py  # Android export script (TorchScript)
+│   └── android_model/   # Android export output
+├── logs/                # Execution logs
 ├── model/
+│   ├── tokenizer/       # Trained tokenizer
 │   ├── transformer/     # Model, config, dataset, tokenizer
 │   ├── metrics.py       # Training metrics tracking and plotting
 │   ├── train_model.py   # Main training loop
@@ -109,19 +114,26 @@ python model/hyperparameter.py
 - Intermediate and final results are saved in `model/hyperparameters/` and `model/output/`.
 - You can customize the search space by editing the fields in `HyperparameterSearchSpace`.
 
+### 7. Export model for Android
+
+After training, you can export the model and tokenizer for Android deployment (optimized TorchScript):
+
+```bash
+python export_device/export_model.py
 ```
 
-Optimization results are saved in `model/hyperparameters/optimization_results.json` and the best configuration in `model/output/final_optimization_results.json`.
+- The script loads the checkpoint from `model/output/llama_model.pt` and tokenizer from `model/tokenizer/`.
+- The model is wrapped for mobile inference and exported in TorchScript format.
+- Exported files (model, tokenizer, config) are saved in `export_device/android_model/`.
+- Android-specific metadata is included for easy integration.
 
-## Checkpointing and Resume
-
-- Checkpoints are saved periodically in `model/output/` or `model/hyperparameters/`.
-- If interrupted (`Ctrl+C`), training automatically resumes from the last available checkpoint.
+You can integrate these files directly into your Android app for on-device inference.
 
 ## Output
 
 - **Model and checkpoints:** `model/output/` or `model/hyperparameters/`
 - **Tokenizers:** `model/tokenizer/`
+- **Android export:** `export_device/android_model/`
 - **Plots and metrics:** `model/plots/`
 - **Logs:** `logs/`
 
