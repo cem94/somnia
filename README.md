@@ -38,8 +38,8 @@ This repository contains the full pipeline for data preparation, custom tokenize
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/cem94/somnia-project.git
-   cd somnia-project
+   git clone https://github.com/cem94/somnia.git
+   cd somnia
    ```
 
 2. **Install dependencies:**
@@ -97,6 +97,21 @@ Or standard training only:
 ```bash
 python model/train_model.py
 ```
+
+### 6. Hyperparameter optimization
+
+To perform automated hyperparameter search and final training with the best configuration, run:
+```bash
+python model/hyperparameter.py
+```
+
+- The search space is defined in `model/hyperparameter.py` (`HyperparameterSearchSpace` class).
+- Intermediate and final results are saved in `model/hyperparameters/` and `model/output/`.
+- You can customize the search space by editing the fields in `HyperparameterSearchSpace`.
+
+```
+
+Optimization results are saved in `model/hyperparameters/optimization_results.json` and the best configuration in `model/output/final_optimization_results.json`.
 
 ## Checkpointing and Resume
 

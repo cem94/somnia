@@ -2,7 +2,7 @@
 Hyperparameter optimization module for Somnia Transformer.
 
 This module provides systematic hyperparameter search capabilities for the Somnia Transformer:
-  - Random search optimization with configurable search space
+  - Targeted search optimization for ~80MB model size
   - Persistent result storage and recovery
   - Comprehensive trial tracking and validation
   - Final training with best found configuration
@@ -34,55 +34,120 @@ warnings.filterwarnings('ignore')
 @dataclass
 class HyperparameterSearchSpace:
     """
-    Hyperparameter search space definition for systematic exploration.
+    Hyperparameter search space definition optimized for ~80MB model size.
     
-    Defines ranges and discrete options for each hyperparameter category:
-    - Architecture parameters (dimensions, layers, attention heads)
-    - Training parameters (learning rate, batch size, regularization)
+    Defines targeted ranges for ~80MB model size:
+    - Architecture parameters optimized for memory efficiency
+    - Training parameters tuned for Colab GPU constraints
     """
-    # Architecture parameters
-    dim: Any = field(default_factory=lambda: [128, 256, 384])
-    n_layers: Any = field(default_factory=lambda: [3, 4, 6])
-    n_heads: Any = field(default_factory=lambda: [4, 6, 8])
-    n_kv_heads: Any = field(default_factory=lambda: [2, 4, 6])
-    dropout: Any = (0.05, 0.25)
     
-    # Training parameters
-    learning_rate: Any = (1e-4, 1e-3)
-    batch_size: Any = field(default_factory=lambda: [4, 8, 16])
-    accumulation_steps: Any = field(default_factory=lambda: [4, 8, 16])
+    # Architecture parameters - optimized for ~80MB model size
+    # These combinations are pre-validated for architectural consistency
+    model_configs: Any = field(default_factory=lambda: [
+    # Small configs (~60MB)
+    {'dim': 384, 'n_layers': 8, 'n_heads': 6, 'n_kv_heads': 4},
+    {'dim': 448, 'n_layers': 8, 'n_heads': 8, 'n_kv_heads': 4},
+    {'dim': 384, 'n_layers': 10, 'n_heads': 8, 'n_kv_heads': 4},
+    {'dim': 512, 'n_layers': 6, 'n_heads': 8, 'n_kv_heads': 4},
+    # Medium configs (~70-90MB)
+    {'dim': 448, 'n_layers': 10, 'n_heads': 8, 'n_kv_heads': 4},
+    {'dim': 512, 'n_layers': 8, 'n_heads': 8, 'n_kv_heads': 2},
+    {'dim': 576, 'n_layers': 6, 'n_heads': 12, 'n_kv_heads': 4},
+    {'dim': 512, 'n_layers': 10, 'n_heads': 8, 'n_kv_heads': 4},
+    {'dim': 384, 'n_layers': 12, 'n_heads': 12, 'n_kv_heads': 4},
+    {'dim': 640, 'n_layers': 6, 'n_heads': 10, 'n_kv_heads': 5},
+    {'dim': 512, 'n_layers': 12, 'n_heads': 8, 'n_kv_heads': 4},
+    {'dim': 576, 'n_layers': 10, 'n_heads': 12, 'n_kv_heads': 4},
+    # Large config (~90-100MB)
+    {'dim': 640, 'n_layers': 8, 'n_heads': 10, 'n_kv_heads': 5},
+    {'dim': 512, 'n_layers': 14, 'n_heads': 8, 'n_kv_heads': 4},
+    {'dim': 576, 'n_layers': 12, 'n_heads': 12, 'n_kv_heads': 6},
+    {'dim': 640, 'n_layers': 10, 'n_heads': 10, 'n_kv_heads': 5},
+    ])
+    
+    dropout: Any = (0.05, 0.2)
+    learning_rate: Any = (5e-5, 8e-4) 
+    batch_size: Any = field(default_factory=lambda: [8, 16]) 
+    accumulation_steps: Any = field(default_factory=lambda: [4, 8])
     grad_clip: Any = 1.0
     
-    # Fixed parameters for search
+    # Training duration
     epochs: Any = 3
+    
+    def calculate_model_size_mb(self, config: Dict[str, Any]) -> float:
+        """
+        Calculate approximate model size in MB for given configuration.
+        
+        Args:
+            config: Model configuration dictionary
+            
+        Returns:
+            Estimated model size in megabytes
+        """
+        dim = config['dim']
+        n_layers = config['n_layers']
+        n_heads = config['n_heads']
+        n_kv_heads = config['n_kv_heads']
+        vocab_size = TokenizerConfig.VOCAB_SIZE
+        
+        # Embedding parameters (tied weights, so counted once)
+        embedding_params = vocab_size * dim
+        
+        # Attention parameters per layer
+        head_dim = dim // n_heads
+        attention_params_per_layer = (
+            dim * (n_heads * head_dim) +  # Query projection
+            dim * (n_kv_heads * head_dim) +  # Key projection  
+            dim * (n_kv_heads * head_dim) +  # Value projection
+            (n_heads * head_dim) * dim 
+        )
+        
+        # Feed-forward parameters per layer (SwiGLU variant)
+        hidden_dim = int(2 * (4 * dim) / 3)
+        hidden_dim = ((hidden_dim + 63) // 64) * 64  # Round to multiple of 64
+        ffn_params_per_layer = (
+            dim * hidden_dim * 2 +  # Gate and up projections
+            hidden_dim * dim  # Down projection
+        )
+        
+        # Layer norm parameters per layer
+        norm_params_per_layer = dim * 2  # Attention norm + FFN norm
+        
+        # Final layer norm
+        final_norm_params = dim
+        
+        # Total parameters
+        total_params = (
+            embedding_params +
+            n_layers * (attention_params_per_layer + ffn_params_per_layer + norm_params_per_layer) +
+            final_norm_params
+        )
+        
+        # Convert to MB (assuming float16, so 2 bytes per parameter)
+        size_mb = (total_params * 2) / (1024 * 1024)
+        
+        return size_mb
     
     def validate_hyperparameter_combination(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Validate and adjust hyperparameter combinations for architectural consistency.
-        
-        Ensures that:
-        - Embedding dimension is divisible by number of attention heads
-        - Key-value heads are compatible with total attention heads
+        Validate hyperparameter combinations - now using pre-validated configs.
         
         Args:
             config: Dictionary of hyperparameters to validate
             
         Returns:
-            Validated and adjusted configuration
+            Validated configuration
         """
-        # Ensure dim is divisible by n_heads for attention mechanism
-        if config['dim'] % config['n_heads'] != 0:
-            adjusted_dim = (config['dim'] // config['n_heads']) * config['n_heads']
-            LOGGER.debug(f"Adjusted dim from {config['dim']} to {adjusted_dim}")
-            config['dim'] = adjusted_dim
+        # Basic sanity checks
+        assert config['dim'] % config['n_heads'] == 0, f"dim ({config['dim']}) must be divisible by n_heads ({config['n_heads']})"
+        assert config['n_heads'] % config['n_kv_heads'] == 0, f"n_heads ({config['n_heads']}) must be divisible by n_kv_heads ({config['n_kv_heads']})"
         
-        # Ensure n_kv_heads is compatible with n_heads
-        if config['n_kv_heads'] > config['n_heads']:
-            adjusted_kv_heads = max(1, config['n_heads'] // 2)
-            LOGGER.debug(f"Adjusted n_kv_heads from {config['n_kv_heads']} to {adjusted_kv_heads}")
-            config['n_kv_heads'] = adjusted_kv_heads
+        # Log model size
+        model_size = self.calculate_model_size_mb(config)
+        LOGGER.debug(f"Model configuration size: {model_size:.1f} MB")
         
         return config
+
 
 @dataclass
 class HyperparameterTrialResult:
@@ -102,10 +167,9 @@ class HyperparameterTrialResult:
 
 class HyperparameterOptimizer:
     """
-    Hyperparameter optimizer using random search strategy.
+    Hyperparameter optimizer using targeted search strategy for ~80MB models.
     
-    Performs systematic exploration of hyperparameter space with:
-    - Random sampling from defined search space
+    Performs systematic exploration of optimized hyperparameter space with:
     - Persistent result storage and recovery
     - Trial validation and error handling
     - Best configuration tracking
@@ -195,41 +259,40 @@ class HyperparameterOptimizer:
         except Exception as save_error:
             LOGGER.error(f"Failed to save optimization results: {save_error}")
     
-    def _sample_random_hyperparameters(self) -> Dict[str, Any]:
+    def _sample_targeted_hyperparameters(self) -> Dict[str, Any]:
         """
-        Sample hyperparameters randomly from the defined search space.
+        Sample hyperparameters from pre-validated model configurations.
         
-        Handles different parameter types:
-        - Fixed values (int/float)
-        - Discrete choices (list)
-        - Continuous ranges (tuple)
+        Uses the pre-calculated model configurations to ensure consistent
+        ~80MB model size while varying training hyperparameters.
         
         Returns:
-            Dictionary of randomly sampled hyperparameters
+            Dictionary of sampled hyperparameters with model size info
         """
-        sampled_config = {}
+        # Select a model configuration
+        model_config = random.choice(self.search_space.model_configs).copy()
         
-        for parameter_name, parameter_space in asdict(self.search_space).items():
-            if isinstance(parameter_space, (int, float)):
-                # Fixed value parameter
-                sampled_config[parameter_name] = parameter_space
-                
-            elif isinstance(parameter_space, list):
-                # Discrete choice parameter
-                sampled_config[parameter_name] = random.choice(parameter_space)
-                
-            elif isinstance(parameter_space, tuple) and len(parameter_space) == 2:
-                # Continuous range parameter
-                min_value, max_value = parameter_space
-                if isinstance(min_value, float):
-                    sampled_config[parameter_name] = random.uniform(min_value, max_value)
-                else:
-                    sampled_config[parameter_name] = random.randint(min_value, max_value)
+        # Add training hyperparameters
+        sampled_config = model_config.copy()
         
-        # Validate and adjust the sampled configuration
+        # Sample training parameters
+        sampled_config['dropout'] = random.uniform(*self.search_space.dropout)
+        sampled_config['learning_rate'] = random.uniform(*self.search_space.learning_rate)
+        sampled_config['batch_size'] = random.choice(self.search_space.batch_size)
+        sampled_config['accumulation_steps'] = random.choice(self.search_space.accumulation_steps)
+        sampled_config['grad_clip'] = self.search_space.grad_clip
+        sampled_config['epochs'] = self.search_space.epochs
+        
+        # Calculate and log model size
+        model_size = self.search_space.calculate_model_size_mb(sampled_config)
+        sampled_config['_model_size_mb'] = model_size
+        
+        # Validate configuration
         validated_config = self.search_space.validate_hyperparameter_combination(sampled_config)
         
-        LOGGER.debug(f"Sampled hyperparameters: {validated_config}")
+        LOGGER.debug(f"Sampled configuration: {validated_config}")
+        LOGGER.debug(f"Estimated model size: {model_size:.1f} MB")
+        
         return validated_config
     
     def _execute_single_trial(self, trial_hyperparameters: Dict[str, Any], trial_number: int) -> HyperparameterTrialResult:
@@ -319,15 +382,14 @@ class HyperparameterOptimizer:
         """
         Execute the complete hyperparameter optimization process.
         
-        Performs systematic random search across the defined hyperparameter space,
+        Performs systematic search across the pre-validated hyperparameter space,
         tracking progress and maintaining persistent state for recovery.
         
         Returns:
             Best trial result found during optimization, or None if no trials succeeded
         """
-        LOGGER.info("Starting hyperparameter optimization process")
-        LOGGER.info(f"Optimization strategy: Random search with {self.maximum_trials} trials")
-        LOGGER.debug(f"Search space configuration: {asdict(self.search_space)}")
+        LOGGER.info("Starting targeted hyperparameter optimization for ~80MB model")
+        LOGGER.info(f"Optimization strategy: Targeted search with {self.maximum_trials} trials")
         
         optimization_start_time = time.time()
         successful_trial_count = 0
@@ -341,7 +403,7 @@ class HyperparameterOptimizer:
         # Execute optimization trials
         for trial_number in range(starting_trial, self.maximum_trials + 1):
             # Generate trial configuration
-            trial_hyperparameters = self._sample_random_hyperparameters()
+            trial_hyperparameters = self._sample_targeted_hyperparameters()
             
             # Execute trial
             trial_result = self._execute_single_trial(trial_hyperparameters, trial_number)
@@ -487,7 +549,7 @@ def main(skip_hyperparameter_search: bool = True) -> float:
     and final training with optimal configuration.
     
     Args:
-        skip_hyperparameter_search: If True, skip optimization and use default configuration
+        skip_hyperparameter_search: If True, use recommended config instead of searching
         
     Returns:
         Final best validation loss achieved

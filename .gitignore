@@ -61,6 +61,9 @@ docs/_build/
 # Data
 data/raw/
 
+# Data plots
+data/analysis/plots/
+
 # Logs
 logs/
 
