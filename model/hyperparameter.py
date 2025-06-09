@@ -285,7 +285,6 @@ class HyperparameterOptimizer:
         
         # Calculate and log model size
         model_size = self.search_space.calculate_model_size_mb(sampled_config)
-        sampled_config['_model_size_mb'] = model_size
         
         # Validate configuration
         validated_config = self.search_space.validate_hyperparameter_combination(sampled_config)
