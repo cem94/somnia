@@ -79,5 +79,8 @@ model/tokenizer/
 # Hyperparameter output
 model/hyperparameters/
 
+# Kaggle credential
+kaggle_credential/
+
 # DS_Store
 .DS_Store
