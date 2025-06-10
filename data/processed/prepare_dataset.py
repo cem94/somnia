@@ -163,7 +163,7 @@ class FairyTalesProcessor(AbstractDataProcessor):
             "403.txt",
             "409.txt",
             "420.txt",
-            "421.txt"
+            "421.txt",
             "473.txt",
             "640.txt",
             "1479.txt",
@@ -237,10 +237,10 @@ class FairyTalesProcessor(AbstractDataProcessor):
         Process a single fairy tale file and return list of formatted chunks.
         
         Args:
-            file_path: Path to input file
+            file_path: Path to input file.
             
         Returns:
-            List of dictionaries with formatted text chunks
+            List of dictionaries with formatted text chunks.
         """
         try:
             with open(file_path, 'r', encoding=self.encoding, errors='ignore') as file:
@@ -256,7 +256,7 @@ class FairyTalesProcessor(AbstractDataProcessor):
             cleaned_text = cleaned_text.strip()
             
             if not cleaned_text:
-                LOGGER.warning(f"No content after cleaning in file: {file_path}")
+                LOGGER.warning(f"No content after cleaning in file: {file_path}.")
                 return []
             
             # Split into chunks
@@ -271,7 +271,7 @@ class FairyTalesProcessor(AbstractDataProcessor):
             return formatted_chunks
             
         except Exception as error:
-            LOGGER.error(f"Error processing {file_path}: {error}")
+            LOGGER.error(f"Error processing {file_path}: {error}.")
             return []
     
     def process_directory(self, output_file: str) -> None:
@@ -311,8 +311,8 @@ class FairyTalesProcessor(AbstractDataProcessor):
             
             LOGGER.info(f"FairyTalesProcessor: {processed_files} files, {total_chunks} chunks")
                             
-        except Exception as e:
-            LOGGER.error(f"Error processing directory {self.input_directory}: {e}")
+        except Exception as error:
+            LOGGER.error(f"Error processing directory {self.input_directory}: {error}.")
             raise
 
 
@@ -414,8 +414,8 @@ class ChildrenStoriesProcessor(AbstractDataProcessor):
             
             return all_chunks
             
-        except Exception as e:
-            LOGGER.error(f"Error processing {file_path}: {e}")
+        except Exception as error:
+            LOGGER.error(f"Error processing {file_path}: {error}.")
             return []
     
     def process_directory(self, output_file: str) -> None:
@@ -452,8 +452,8 @@ class ChildrenStoriesProcessor(AbstractDataProcessor):
             
             LOGGER.info(f"ChildrenStoriesProcessor: {processed_files} files, {total_chunks} chunks")
             
-        except Exception as e:
-            LOGGER.error(f"Error processing directory {self.input_directory}: {e}")
+        except Exception as error:
+            LOGGER.error(f"Error processing directory {self.input_directory}: {error}.")
             raise
 
 

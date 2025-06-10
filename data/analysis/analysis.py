@@ -123,7 +123,15 @@ def _analyze_raw_data() -> dict:
         if "children_stories" in folder_path:
             # Process children stories dataset
             try:
-                file_path = os.path.join(folder_path, "cleaned_merged_fairy_tales_without_eos.txt")
+                # Find .txt files in the directory instead of hardcoding filename
+                txt_files = [f for f in os.listdir(folder_path) if f.endswith(".txt")]
+                
+                if not txt_files:
+                    LOGGER.warning(f"No .txt files found in folder: {folder}.")
+                    continue
+                
+                # Use the first .txt file found (assuming single file dataset)
+                file_path = os.path.join(folder_path, txt_files[0])
 
                 with open(file_path, 'r', encoding='utf-8') as f:
                     text = f.read()
@@ -315,19 +323,19 @@ def plot_processed_data(summary: dict) -> None:
     from the processed JSONL data.
     
     Args:
-        summary: Analysis summary from _analyze_processed_data()
+        summary: Analysis summary from _analyze_processed_data().
     """
     os.makedirs(PLOTS_DIR, exist_ok=True)
     
     word_freq = summary.get("word_freq", Counter())
     
     if not word_freq:
-        LOGGER.warning("No word frequencies found in processed data")
+        LOGGER.warning("No word frequencies found in processed data.")
         return
     
     most_common_words = word_freq.most_common(10)
     if not most_common_words:
-        LOGGER.warning("No common words found in processed data")
+        LOGGER.warning("No common words found in processed data.")
         return
         
     words, counts = zip(*most_common_words)
@@ -348,7 +356,7 @@ def plot_processed_data(summary: dict) -> None:
     plt.tight_layout()
     plt.savefig(processed_plot_path, dpi=300, bbox_inches='tight')
     plt.close()
-    LOGGER.info(f"Saved processed data plot to {processed_plot_path}")
+    LOGGER.info(f"Saved processed data plot to {processed_plot_path}.")
 
 
 def analyze_raw_data() -> dict:
@@ -356,9 +364,9 @@ def analyze_raw_data() -> dict:
     Run raw data analysis, display summary statistics, and create plots.
     
     Returns:
-        dict: Analysis summary
+        dict: Analysis summary.
     """
-    LOGGER.info("Executing raw data analysis")
+    LOGGER.info("Executing raw data analysis.")
     
     try:
         raw_data_summary = _analyze_raw_data()
@@ -385,8 +393,8 @@ def analyze_raw_data() -> dict:
         
         return raw_data_summary
         
-    except Exception as e:
-        LOGGER.error(f"Failed to analyze raw data: {e}")
+    except Exception as error:
+        LOGGER.error(f"Failed to analyze raw data: {error}.")
         raise
 
 
@@ -395,9 +403,9 @@ def analyze_processed_data() -> dict:
     Run processed data analysis, display summary statistics, and create a plot.
     
     Returns:
-        dict: Analysis summary
+        dict: Analysis summary.
     """
-    LOGGER.info("Executing processed data analysis")
+    LOGGER.info("Executing processed data analysis.")
     
     try:
         processed_summary = _analyze_processed_data()
@@ -417,8 +425,8 @@ def analyze_processed_data() -> dict:
         
         return processed_summary
         
-    except Exception as e:
-        LOGGER.error(f"Failed to analyze processed data: {e}")
+    except Exception as error:
+        LOGGER.error(f"Failed to analyze processed data: {error}.")
         raise
 
 

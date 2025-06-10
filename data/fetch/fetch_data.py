@@ -36,18 +36,18 @@ def verify_kaggle_credentials():
     """
     if not os.path.exists(KAGGLE_CONFIG_FILE):
         error_msg = (f"Kaggle API token not found at {KAGGLE_CONFIG_FILE}. "
-                    "Please download your API token from kaggle.com/account")
+                    "Please download your API token from kaggle.com/account.")
         LOGGER.error(error_msg)
         raise FileNotFoundError(error_msg)
     
-    LOGGER.info("Kaggle API token file found, verifying authentication...")
+    LOGGER.info("Kaggle API token file found. Verifying authentication.")
     
     try:
         # Test API authentication
         api.authenticate()
-        LOGGER.info("Kaggle API authentication successful")
-    except Exception as e:
-        LOGGER.error(f"Kaggle API authentication failed: {str(e)}")
+        LOGGER.info("Kaggle API authentication successful.")
+    except Exception as error:
+        LOGGER.error(f"Kaggle API authentication failed: {error}.")
         raise
 
 
@@ -64,14 +64,14 @@ def is_dataset_downloaded(dataset_name: str) -> bool:
     dataset_path = os.path.join(RAW_DATA_DIR, dataset_name)
     
     if not os.path.exists(dataset_path) or not os.path.isdir(dataset_path):
-        LOGGER.debug(f"Dataset directory '{dataset_path}' does not exist")
+        LOGGER.debug(f"Dataset directory '{dataset_path}' does not exist.")
         return False
     
     if not os.listdir(dataset_path):
-        LOGGER.debug(f"Dataset directory '{dataset_path}' is empty")
+        LOGGER.debug(f"Dataset directory '{dataset_path}' is empty.")
         return False
     
-    LOGGER.info(f"Dataset '{dataset_name}' already exists with files")
+    LOGGER.info(f"Dataset '{dataset_name}' already exists with files.")
     return True
 
 
@@ -86,7 +86,7 @@ def organize_dataset_files(dataset_path: str):
     Args:
         dataset_path (str): Path to the dataset directory to organize.
     """
-    LOGGER.debug(f"Organizing files in {dataset_path}")
+    LOGGER.debug(f"Organizing files in {dataset_path}.")
     
     for item in os.listdir(dataset_path):
         item_path = os.path.join(dataset_path, item)
@@ -99,11 +99,11 @@ def organize_dataset_files(dataset_path: str):
                 
                 if os.path.isfile(source_file):
                     os.rename(source_file, destination_file)
-                    LOGGER.debug(f"Moved: {file_name}")
+                    LOGGER.debug(f"Moved: {file_name}.")
             
             # Remove empty subdirectory
             os.rmdir(item_path)
-            LOGGER.debug(f"Removed empty directory: {item}")
+            LOGGER.debug(f"Removed empty directory: {item}.")
 
 
 def download_dataset(dataset_name: str, dataset_id: str):
@@ -118,10 +118,10 @@ def download_dataset(dataset_name: str, dataset_id: str):
         Exception: If download or extraction fails.
     """
     if is_dataset_downloaded(dataset_name):
-        LOGGER.info(f"Dataset '{dataset_name}' already exists, skipping download")
+        LOGGER.info(f"Dataset '{dataset_name}' already exists. Skipping download.")
         return
 
-    LOGGER.info(f"Downloading dataset: {dataset_name} ({dataset_id})")
+    LOGGER.info(f"Downloading dataset: {dataset_name} ({dataset_id}).")
     
     dataset_path = os.path.join(RAW_DATA_DIR, dataset_name)
     os.makedirs(dataset_path, exist_ok=True)
@@ -133,10 +133,10 @@ def download_dataset(dataset_name: str, dataset_id: str):
         # Organize files (flatten directory structure)
         organize_dataset_files(dataset_path)
         
-        LOGGER.info(f"Successfully downloaded and organized: {dataset_name}")
+        LOGGER.info(f"Successfully downloaded and organized: {dataset_name}.")
         
-    except Exception as e:
-        LOGGER.error(f"Failed to download dataset '{dataset_name}': {str(e)}")
+    except Exception as error:
+        LOGGER.error(f"Failed to download dataset '{dataset_name}': {error}.")
         raise
 
 
@@ -151,20 +151,20 @@ def log_dataset_contents(dataset_name: str):
     
     try:
         if not os.path.exists(dataset_path):
-            LOGGER.warning(f"Dataset directory '{dataset_path}' not found")
+            LOGGER.warning(f"Dataset directory '{dataset_path}' not found.")
             return
             
         files = [f for f in os.listdir(dataset_path) 
                 if os.path.isfile(os.path.join(dataset_path, f))]
         
-        LOGGER.info(f"Dataset '{dataset_name}' contains {len(files)} files")
+        LOGGER.info(f"Dataset '{dataset_name}' contains {len(files)} files.")
         
         if files:
             LOGGER.debug(f"Files in '{dataset_name}': {', '.join(files[:5])}"
                         f"{'...' if len(files) > 5 else ''}")
         
-    except Exception as e:
-        LOGGER.error(f"Error inspecting dataset '{dataset_name}': {str(e)}")
+    except Exception as error:
+        LOGGER.error(f"Error inspecting dataset '{dataset_name}': {error}.")
 
 
 def main():
@@ -176,7 +176,7 @@ def main():
     2. Download each configured dataset.
     3. Log dataset contents for verification.
     """
-    LOGGER.info("Starting Kaggle dataset download process.")
+    LOGGER.info("Pipeline Stage 1: Starting Kaggle dataset download process.")
     
     try:
         # Verify API access before starting downloads
@@ -188,10 +188,10 @@ def main():
             download_dataset(dataset_name, dataset_id)
             log_dataset_contents(dataset_name)
 
-        LOGGER.info("All datasets processed successfully.")
+        LOGGER.info("Pipeline Stage 1 completed successfully.")
         
-    except Exception as e:
-        LOGGER.error(f"Dataset download process failed: {str(e)}.")
+    except Exception as error:
+        LOGGER.error(f"Pipeline Stage 1 failed: {error}.")
         sys.exit(1)
 
 if __name__ == "__main__":
