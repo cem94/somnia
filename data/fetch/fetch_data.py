@@ -172,11 +172,11 @@ def main():
     Main function to download all configured datasets from Kaggle.
     
     This function orchestrates the complete download process:
-    1. Verify Kaggle API credentials
-    2. Download each configured dataset
-    3. Log dataset contents for verification
+    1. Verify Kaggle API credentials.
+    2. Download each configured dataset.
+    3. Log dataset contents for verification.
     """
-    LOGGER.info("Starting Kaggle dataset download process")
+    LOGGER.info("Starting Kaggle dataset download process.")
     
     try:
         # Verify API access before starting downloads
@@ -184,16 +184,15 @@ def main():
         
         # Process each dataset
         for dataset_name, dataset_id in DATASETS.items():
-            LOGGER.info(f"Processing dataset: {dataset_name}")
+            LOGGER.info(f"Processing dataset: {dataset_name}.")
             download_dataset(dataset_name, dataset_id)
             log_dataset_contents(dataset_name)
 
-        LOGGER.info("All datasets processed successfully")
+        LOGGER.info("All datasets processed successfully.")
         
     except Exception as e:
-        LOGGER.error(f"Dataset download process failed: {str(e)}")
+        LOGGER.error(f"Dataset download process failed: {str(e)}.")
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()

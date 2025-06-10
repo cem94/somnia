@@ -42,36 +42,36 @@ class AbstractDataProcessor(ABC):
     @property
     @abstractmethod
     def encoding(self) -> str:
-        """Return encoding for this dataset"""
+        """Return the encoding used for reading files."""
         pass
 
     @property
     @abstractmethod
     def char_mappings(self) -> dict:
-        """Return character mappings for this dataset"""
+        """Return character mappings for text normalization."""
         pass
 
-    def __init__(self, input_dir: str):
-        self.input_dir = input_dir
+    def __init__(self, input_directory: str):
+        self.input_directory = input_directory
         
-    def clean_text(self, text: str) -> str:
+    def clean_text(self, raw_text: str) -> str:
         """
         Clean and normalize text content.
         
         Args:
-            text: Raw text to clean
+            raw_text: Raw text to clean
             
         Returns:
             Cleaned and normalized text
         """
-        content = text.strip()
+        cleaned_content = raw_text.strip()
         # Replace character mappings
-        for key, value in self.char_mappings.items():
-            content = content.replace(key, value)
+        for old_char, new_char in self.char_mappings.items():
+            cleaned_content = cleaned_content.replace(old_char, new_char)
         # Normalize whitespace
-        return ' '.join(content.split())
+        return ' '.join(cleaned_content.split())
     
-    def split_into_chunks(self, text: str) -> list[str]:
+    def split_into_chunks(self, text_content: str) -> list[str]:
         """
         Split text into word-based chunks approximating token limits.
         
@@ -79,16 +79,16 @@ class AbstractDataProcessor(ABC):
         a trained tokenizer would be needed.
         
         Args:
-            text: Text to split into chunks
+            text_content: Text to split into chunks
             
         Returns:
             List of text chunks
         """
-        if not text.strip():
+        if not text_content.strip():
             return []
             
         chunks = []
-        words = text.split()
+        words = text_content.split()
         
         for i in range(0, len(words), TokenizerConfig.MAX_SEQ_LEN):
             chunk_words = words[i:i + TokenizerConfig.MAX_SEQ_LEN]
@@ -98,34 +98,34 @@ class AbstractDataProcessor(ABC):
                 
         return chunks
     
-    def format_chunk_with_tokens(self, chunk: str) -> dict:
+    def format_chunk_with_tokens(self, chunk_text: str) -> dict:
         """
         Format chunk with BOS/EOS tokens.
         
         Args:
-            chunk: Text chunk to format
+            chunk_text: Text chunk to format
             
         Returns:
             Dictionary with formatted text
         """
-        if not chunk.strip():
+        if not chunk_text.strip():
             return {"text": ""}
             
         formatted_text = (
             TokenizerConfig.BOS_TOKEN_VALUE + 
-            chunk + 
+            chunk_text + 
             TokenizerConfig.EOS_TOKEN_VALUE
         )
         return {"text": formatted_text}
     
     @abstractmethod
-    def process_file(self, input_file: str) -> list[dict]:
-        """Process a single file and return list of formatted chunks"""
+    def process_file(self, file_path: str) -> list[dict]:
+        """Process a single file and return list of formatted chunks."""
         pass
     
     @abstractmethod
-    def process_directory(self, output_file: str) -> None:
-        """Process all files in directory"""
+    def process_directory(self, output_file_path: str) -> None:
+        """Process all files in the directory."""
         pass
 
 
@@ -144,8 +144,8 @@ class FairyTalesProcessor(AbstractDataProcessor):
     @property
     def char_mappings(self) -> dict:
         return {
-            "--": " ",  # Remove double dash
-            "*": "", # Remove astrisk
+            "--": " ",  # Replace double dash with space
+            "*": "",    # Remove asterisk
         }
     
     @property
@@ -217,8 +217,8 @@ class FairyTalesProcessor(AbstractDataProcessor):
         ]
     
     @property
-    def story_pattern(self) -> list[str]:
-        """Regex patterns to remove title and metadata from stories"""
+    def story_patterns(self) -> list[str]:
+        """Regex patterns to remove titles and metadata from stories."""
         return [
             r'^(?:[A-Z0-9\-\'\,\(\)\:]{2,}\s)+',
             r'^\([A-Z ]+\)',
@@ -232,46 +232,46 @@ class FairyTalesProcessor(AbstractDataProcessor):
             r'^(.{,1000}\[[\d]+\](\s?))'
         ]
     
-    def process_file(self, input_file: str) -> list[dict]:
+    def process_file(self, file_path: str) -> list[dict]:
         """
         Process a single fairy tale file and return list of formatted chunks.
         
         Args:
-            input_file: Path to input file
+            file_path: Path to input file
             
         Returns:
             List of dictionaries with formatted text chunks
         """
         try:
-            with open(input_file, 'r', encoding=self.encoding, errors='ignore') as f:
-                text = f.read()
+            with open(file_path, 'r', encoding=self.encoding, errors='ignore') as file:
+                raw_text = file.read()
                 
             # Clean and normalize text
-            cleaned_text = self.clean_text(text)
+            cleaned_text = self.clean_text(raw_text)
             
             # Remove title and metadata patterns
-            for pattern in self.story_pattern:
+            for pattern in self.story_patterns:
                 cleaned_text = re.sub(pattern, '', cleaned_text, flags=re.MULTILINE)
             
             cleaned_text = cleaned_text.strip()
             
             if not cleaned_text:
-                LOGGER.warning(f"No content after cleaning in file: {input_file}")
+                LOGGER.warning(f"No content after cleaning in file: {file_path}")
                 return []
             
             # Split into chunks
-            chunks = self.split_into_chunks(cleaned_text)
+            text_chunks = self.split_into_chunks(cleaned_text)
             
             # Format chunks with tokens
             formatted_chunks = [
                 self.format_chunk_with_tokens(chunk) 
-                for chunk in chunks
+                for chunk in text_chunks
             ]
             
             return formatted_chunks
             
-        except Exception as e:
-            LOGGER.error(f"Error processing {input_file}: {e}")
+        except Exception as error:
+            LOGGER.error(f"Error processing {file_path}: {error}")
             return []
     
     def process_directory(self, output_file: str) -> None:
@@ -281,12 +281,12 @@ class FairyTalesProcessor(AbstractDataProcessor):
         Args:
             output_file: Path to output JSONL file
         """
-        if not os.path.exists(self.input_dir):
-            LOGGER.warning(f"Directory not found: {self.input_dir}")
+        if not os.path.exists(self.input_directory):
+            LOGGER.warning(f"Directory not found: {self.input_directory}")
             return
             
         try:
-            files = os.listdir(self.input_dir)
+            files = os.listdir(self.input_directory)
             processed_files = 0
             total_chunks = 0
             
@@ -298,7 +298,7 @@ class FairyTalesProcessor(AbstractDataProcessor):
                     if file in self.files_to_skip:
                         continue
                         
-                    file_path = os.path.join(self.input_dir, file)
+                    file_path = os.path.join(self.input_directory, file)
                     file_chunks = self.process_file(file_path)
                     
                     for record in file_chunks:
@@ -312,7 +312,7 @@ class FairyTalesProcessor(AbstractDataProcessor):
             LOGGER.info(f"FairyTalesProcessor: {processed_files} files, {total_chunks} chunks")
                             
         except Exception as e:
-            LOGGER.error(f"Error processing directory {self.input_dir}: {e}")
+            LOGGER.error(f"Error processing directory {self.input_directory}: {e}")
             raise
 
 
@@ -332,33 +332,33 @@ class ChildrenStoriesProcessor(AbstractDataProcessor):
     @property
     def char_mappings(self) -> dict:
         return {
-            '\u201c': '"', '\u201d': '"',  # Double quotation marks
-            '\u2018': "'", '\u2019': "'",  # Single quotation marks
-            '\u2013': '-', '\u2014': '-',  # En dash, em dash
-            '\u2026': '...',               # Ellipsis
-            '\u2022': '*',                 # Bullet
-            '\u00a0': ' ',                 # Non-breaking space
+            '\u201c': '"', '\u201d': '"',  # Replace double quotation marks
+            '\u2018': "'", '\u2019': "'",  # Replace single quotation marks
+            '\u2013': '-', '\u2014': '-',  # Replace en dash and em dash
+            '\u2026': '...',               # Replace ellipsis
+            '\u2022': '*',                 # Replace bullet
+            '\u00a0': ' ',                 # Replace non-breaking space
         }
     
     @property
     def story_separator_patterns(self) -> list[str]:
-        """Regex patterns to identify story separators/titles"""
+        """Regex patterns to identify story separators/titles."""
         return [
             r"(?m)^[A-Z0-9][A-Z0-9 '\-\.]{2,}$",    # Title case lines
             r"(\n\n[\w\s'\-\.]{2,50}\n\n)"          # Short lines between double newlines
         ]
         
-    def split_into_stories(self, text: str) -> list[str]:
+    def split_into_stories(self, raw_text: str) -> list[str]:
         """
         Extract individual stories by identifying content blocks.
         
         Args:
-            text: Full text content from file
+            raw_text: Full text content from file
             
         Returns:
             List of individual story texts
         """
-        content = text
+        content = raw_text
         
         # Apply character mappings
         for old_char, new_char in self.char_mappings.items():
@@ -369,26 +369,26 @@ class ChildrenStoriesProcessor(AbstractDataProcessor):
             content = re.sub(pattern, '\n\n', content, flags=re.MULTILINE)
         
         # Split on double newlines and filter empty/short content
-        stories = [s.strip() for s in content.split('\n\n')]
+        stories = [story.strip() for story in content.split('\n\n')]
         # Filter out very short content that's likely just titles/metadata
-        valid_stories = [s for s in stories if len(s.split()) > 10]
+        valid_stories = [story for story in stories if len(story.split()) > 10]
 
-        LOGGER.info(f"On children-stories file found {len(valid_stories)} stories")
+        LOGGER.info(f"Found {len(valid_stories)} valid stories in children stories file.")
         
         return valid_stories
     
-    def process_file(self, input_file: str) -> list[dict]:
+    def process_file(self, file_path: str) -> list[dict]:
         """
         Process a single children stories file and return list of formatted chunks.
         
         Args:
-            input_file: Path to input file
+            file_path: Path to input file
             
         Returns:
             List of dictionaries with formatted text chunks
         """
         try:
-            with open(input_file, 'r', encoding=self.encoding) as f:
+            with open(file_path, 'r', encoding=self.encoding) as f:
                 text = f.read()
             
             all_chunks = []
@@ -415,7 +415,7 @@ class ChildrenStoriesProcessor(AbstractDataProcessor):
             return all_chunks
             
         except Exception as e:
-            LOGGER.error(f"Error processing {input_file}: {e}")
+            LOGGER.error(f"Error processing {file_path}: {e}")
             return []
     
     def process_directory(self, output_file: str) -> None:
@@ -425,12 +425,12 @@ class ChildrenStoriesProcessor(AbstractDataProcessor):
         Args:
             output_file: Path to output JSONL file
         """
-        if not os.path.exists(self.input_dir):
-            LOGGER.warning(f"Directory not found: {self.input_dir}")
+        if not os.path.exists(self.input_directory):
+            LOGGER.warning(f"Directory not found: {self.input_directory}")
             return
             
         try:
-            files = os.listdir(self.input_dir)
+            files = os.listdir(self.input_directory)
             processed_files = 0
             total_chunks = 0
             
@@ -439,7 +439,7 @@ class ChildrenStoriesProcessor(AbstractDataProcessor):
                     if not file.endswith('.txt'):
                         continue
                         
-                    file_path = os.path.join(self.input_dir, file)
+                    file_path = os.path.join(self.input_directory, file)
                     file_chunks = self.process_file(file_path)
                     
                     for record in file_chunks:
@@ -453,7 +453,7 @@ class ChildrenStoriesProcessor(AbstractDataProcessor):
             LOGGER.info(f"ChildrenStoriesProcessor: {processed_files} files, {total_chunks} chunks")
             
         except Exception as e:
-            LOGGER.error(f"Error processing directory {self.input_dir}: {e}")
+            LOGGER.error(f"Error processing directory {self.input_directory}: {e}")
             raise
 
 
@@ -465,12 +465,12 @@ def main():
     datasets through their respective processors. Existing output file
     will be removed if present.
     """
-    LOGGER.info("Starting dataset preparation")
+    LOGGER.info("Pipeline Stage 1: Starting dataset preparation.")
     
     # Remove existing output file
     if os.path.exists(PROCESSED_OUTPUT_FILE):
         os.remove(PROCESSED_OUTPUT_FILE)
-        LOGGER.info(f"Removed existing output file: {PROCESSED_OUTPUT_FILE}")
+        LOGGER.info(f"Existing output file removed: {PROCESSED_OUTPUT_FILE}.")
     
     # Initialize processors
     processors = [
@@ -479,20 +479,21 @@ def main():
     ]
     
     total_processors = len(processors)
+    LOGGER.info(f"Initialized {total_processors} dataset processors.")
     
     # Process each dataset
     for i, processor in enumerate(processors, 1):
         processor_name = processor.__class__.__name__
-        LOGGER.info(f"Processing dataset {i}/{total_processors}: {processor_name}")
+        LOGGER.info(f"Processing dataset {i}/{total_processors}: {processor_name}.")
         
         try:
             processor.process_directory(PROCESSED_OUTPUT_FILE)
-        except Exception as e:
-            LOGGER.error(f"Failed to process {processor_name}: {e}")
+            LOGGER.info(f"Dataset {processor_name} processed successfully.")
+        except Exception as error:
+            LOGGER.error(f"Failed to process {processor_name}: {error}.")
             continue
     
-    LOGGER.info(f"Dataset preparation completed. Output saved to: {PROCESSED_OUTPUT_FILE}")
-
+    LOGGER.info(f"Pipeline Stage 1 completed. Output saved to: {PROCESSED_OUTPUT_FILE}.")
 
 if __name__ == "__main__":
     main()
