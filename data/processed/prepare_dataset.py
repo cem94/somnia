@@ -145,7 +145,76 @@ class FairyTalesProcessor(AbstractDataProcessor):
     def char_mappings(self) -> dict:
         return {
             "--": " ",  # Remove double dash
+            "*": "", # Remove astrisk
         }
+    
+    @property
+    def files_to_skip(self) -> list:
+        return [
+            "366.txt",
+            "368.txt",
+            "377.txt",
+            "385.txt",
+            "388.txt",
+            "398.txt",
+            "399.txt",
+            "400.txt",
+            "401.txt",
+            "403.txt",
+            "409.txt",
+            "420.txt",
+            "421.txt"
+            "473.txt",
+            "640.txt",
+            "1479.txt",
+            "1480.txt",
+            "1481.txt",
+            "1483.txt",
+            "1484.txt",
+            "1485.txt",
+            "1486.txt",
+            "1487.txt",
+            "1488.txt",
+            "1489.txt",
+            "1490.txt",
+            "1491.txt",
+            "1492.txt",
+            "1493.txt",
+            "1494.txt",
+            "1495.txt",
+            "1496.txt",
+            "1497.txt",
+            "1498.txt",
+            "1499.txt",
+            "1500.txt",
+            "1501.txt",
+            "1502.txt",
+            "1503.txt",
+            "1504.txt",
+            "1505.txt",
+            "1506.txt",
+            "1507.txt",
+            "1508.txt",
+            "1509.txt",
+            "1510.txt",
+            "1511.txt",
+            "1512.txt",
+            "1513.txt",
+            "1514.txt",
+            "1515.txt",
+            "1516.txt",
+            "1517.txt",
+            "1518.txt",
+            "1519.txt",
+            "1520.txt",
+            "1521.txt",
+            "1522.txt",
+            "1523.txt",
+            "1524.txt",
+            "1525.txt",
+            "1526.txt",
+            "1527.txt",
+        ]
     
     @property
     def story_pattern(self) -> list[str]:
@@ -225,6 +294,9 @@ class FairyTalesProcessor(AbstractDataProcessor):
                 for file in natsorted(files):
                     if not file.endswith('.txt'):
                         continue
+
+                    if file in self.files_to_skip:
+                        continue
                         
                     file_path = os.path.join(self.input_dir, file)
                     file_chunks = self.process_file(file_path)
@@ -300,6 +372,8 @@ class ChildrenStoriesProcessor(AbstractDataProcessor):
         stories = [s.strip() for s in content.split('\n\n')]
         # Filter out very short content that's likely just titles/metadata
         valid_stories = [s for s in stories if len(s.split()) > 10]
+
+        LOGGER.info(f"On children-stories file found {len(valid_stories)} stories")
         
         return valid_stories
     
