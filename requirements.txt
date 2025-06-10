@@ -1,16 +1,18 @@
-# Core dependencies
+# Core ML dependencies
 torch>=2.0.0
 transformers>=4.30.0
 numpy>=1.24.0
 pandas>=2.0.0
+
+# Visualization and plotting
 matplotlib>=3.7.0
 
-# Text processing
+# Text processing and tokenization
 tokenizers>=0.13.0
 natsort>=8.3.0
 
-# Data management
+# Data management and APIs
 kaggle>=1.5.0
 
-# Logging and utilities
+# Progress bars and utilities
 tqdm>=4.65.0

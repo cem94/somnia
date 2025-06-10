@@ -25,7 +25,7 @@ def setup_logger(level=logging.INFO) -> logging.Logger:
     This function is called only once to initialize the global LOGGER.
     
     Args:
-        level (int): The logging level to set. Default is logging.INFO.
+        level (int): The logging level to set (default: logging.INFO).
         
     Returns:
         logging.Logger: The configured logger instance.
