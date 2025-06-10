@@ -20,30 +20,30 @@ class TokenizerConfig:
     of the configuration.
 
     Attributes:
-        SEED (int): Random seed for reproducibility
-        VOCAB_SIZE (int): Size of the vocabulary
-        MAX_SEQ_LEN (int): Maximum sequence length
+        SEED (int): Random seed for reproducibility.
+        VOCAB_SIZE (int): Size of the vocabulary.
+        MAX_SEQ_LEN (int): Maximum sequence length.
         
         # Special token IDs and values
-        BOS_TOKEN_ID (int): Beginning of sequence token ID
-        BOS_TOKEN_VALUE (str): Beginning of sequence token value
-        EOS_TOKEN_ID (int): End of sequence token ID
-        EOS_TOKEN_VALUE (str): End of sequence token value
-        UNK_TOKEN_ID (int): Unknown token ID
-        UNK_TOKEN_VALUE (str): Unknown token value
-        PAD_TOKEN_ID (int): Padding token ID
-        PAD_TOKEN_VALUE (str): Padding token value
+        BOS_TOKEN_ID (int): Beginning of sequence token ID.
+        BOS_TOKEN_VALUE (str): Beginning of sequence token value.
+        EOS_TOKEN_ID (int): End of sequence token ID.
+        EOS_TOKEN_VALUE (str): End of sequence token value.
+        UNK_TOKEN_ID (int): Unknown token ID.
+        UNK_TOKEN_VALUE (str): Unknown token value.
+        PAD_TOKEN_ID (int): Padding token ID.
+        PAD_TOKEN_VALUE (str): Padding token value.
         
-        dataset_path (str): Path to the dataset file
-        output_dir (str): Output directory for tokenizer files
-        evaluate (bool): Whether to evaluate tokenizer performance
-        config (Dict[str, Any]): Complete tokenizer configuration dictionary
+        dataset_path (str): Path to the dataset file.
+        output_dir (str): Output directory for tokenizer files.
+        evaluate (bool): Whether to evaluate tokenizer performance.
+        config (Dict[str, Any]): Complete tokenizer configuration dictionary.
     """
 
     # Global constants - centralized configuration used across the project
     SEED = 42
     VOCAB_SIZE = 20000
-    MAX_SEQ_LEN = 1024
+    MAX_SEQ_LEN = 2048
 
     # Special token IDs and values - standardized across all components
     BOS_TOKEN_ID = 0
@@ -70,39 +70,39 @@ class TokenizerConfig:
 
     def _validate_configuration(self) -> None:
         """Validate the configuration parameters."""
-        LOGGER.debug("Starting tokenizer configuration validation...")
+        LOGGER.debug("Starting tokenizer configuration validation.")
         
         # Validate constants
-        assert self.VOCAB_SIZE > 0, f"Vocabulary size must be positive, got {self.VOCAB_SIZE}"
-        assert self.MAX_SEQ_LEN > 0, f"Max sequence length must be positive, got {self.MAX_SEQ_LEN}"
-        assert self.SEED >= 0, f"Seed must be non-negative, got {self.SEED}"
+        assert self.VOCAB_SIZE > 0, f"Vocabulary size must be positive, got {self.VOCAB_SIZE}."
+        assert self.MAX_SEQ_LEN > 0, f"Max sequence length must be positive, got {self.MAX_SEQ_LEN}."
+        assert self.SEED >= 0, f"Seed must be non-negative, got {self.SEED}."
         
         # Validate special token IDs are unique and non-negative
         token_ids = [self.BOS_TOKEN_ID, self.EOS_TOKEN_ID, self.UNK_TOKEN_ID, self.PAD_TOKEN_ID]
-        assert all(tid >= 0 for tid in token_ids), "All token IDs must be non-negative"
-        assert len(set(token_ids)) == len(token_ids), "All token IDs must be unique"
-        assert all(tid < self.VOCAB_SIZE for tid in token_ids), "All token IDs must be within vocabulary size"
+        assert all(tid >= 0 for tid in token_ids), "All token IDs must be non-negative."
+        assert len(set(token_ids)) == len(token_ids), "All token IDs must be unique."
+        assert all(tid < self.VOCAB_SIZE for tid in token_ids), "All token IDs must be within vocabulary size."
         
-        LOGGER.debug("Token configuration validated successfully")
+        LOGGER.debug("Token configuration validated successfully.")
         
         # Check if dataset file exists
         if not os.path.exists(self.dataset_path):
-            LOGGER.warning(f"Dataset path does not exist: {self.dataset_path}")
+            LOGGER.warning(f"Dataset path does not exist: {self.dataset_path}.")
         else:
-            LOGGER.debug(f"Dataset path validated: {self.dataset_path}")
+            LOGGER.debug(f"Dataset path validated: {self.dataset_path}.")
         
         # Ensure output directory exists
         os.makedirs(self.output_dir, exist_ok=True)
-        LOGGER.debug(f"Output directory validated/created: {self.output_dir}")
+        LOGGER.debug(f"Output directory validated/created: {self.output_dir}.")
         
-        LOGGER.info("Tokenizer configuration validation completed successfully")
+        LOGGER.info("Tokenizer configuration validation completed successfully.")
 
     def _build_tokenizer_config(self) -> Dict[str, Any]:
         """
         Build the tokenizer configuration dictionary.
         
         Returns:
-            Dict[str, Any]: Complete tokenizer configuration
+            Dict[str, Any]: Complete tokenizer configuration.
         """
         config = {
             "add_bos_token": False,
@@ -121,7 +121,7 @@ class TokenizerConfig:
             "added_tokens_decoder": self._build_special_tokens_decoder()
         }
         
-        LOGGER.debug("Tokenizer configuration built successfully")
+        LOGGER.debug("Tokenizer configuration built successfully.")
         return config
 
     def _build_special_tokens_decoder(self) -> Dict[int, Dict[str, Any]]:
@@ -129,7 +129,7 @@ class TokenizerConfig:
         Build the special tokens decoder configuration.
         
         Returns:
-            Dict[int, Dict[str, Any]]: Special tokens decoder mapping
+            Dict[int, Dict[str, Any]]: Special tokens decoder mapping.
         """
         special_tokens = [
             (self.BOS_TOKEN_ID, self.BOS_TOKEN_VALUE),
@@ -149,7 +149,7 @@ class TokenizerConfig:
                 "special": True
             }
         
-        LOGGER.debug(f"Special tokens decoder built for {len(decoder)} tokens")
+        LOGGER.debug(f"Special tokens decoder built for {len(decoder)} tokens.")
         return decoder
 
     def estimate_model_size_mb(self) -> float:
@@ -157,14 +157,15 @@ class TokenizerConfig:
         Estimate the size of the tokenizer in megabytes (MB).
         
         This method calculates the size based on the vocabulary size
-        and configuration data.
+        and configuration data using more accurate estimations.
         
         Returns:
-            float: Estimated tokenizer size in MB
+            float: Estimated tokenizer size in MB.
         """
-        # Vocabulary mapping (token_id -> token_string)
-        # Assuming average token length of 4 characters
-        vocab_size_bytes = self.VOCAB_SIZE * (4 + 4)  # 4 bytes for ID + 4 bytes avg token length
+        # Vocabulary mapping with more realistic token length estimation
+        # BPE tokens typically range from 1-15 characters, avg ~6 characters
+        avg_token_length = 6
+        vocab_size_bytes = self.VOCAB_SIZE * (4 + avg_token_length)  # 4 bytes for ID + avg token length
         
         # Configuration data
         config_size_bytes = len(str(self.config).encode('utf-8'))
@@ -172,10 +173,13 @@ class TokenizerConfig:
         # Special tokens decoder
         decoder_size_bytes = len(str(self.config.get('added_tokens_decoder', {})).encode('utf-8'))
         
-        total_size_bytes = vocab_size_bytes + config_size_bytes + decoder_size_bytes
+        # Additional overhead for tokenizer files (merges, etc.)
+        overhead_bytes = self.VOCAB_SIZE * 2  # Approximate overhead for BPE merges
+        
+        total_size_bytes = vocab_size_bytes + config_size_bytes + decoder_size_bytes + overhead_bytes
         size_mb = total_size_bytes / (1024 * 1024)
         
-        LOGGER.debug(f"Tokenizer size estimation: {total_size_bytes:,} bytes, {size_mb:.2f} MB")
+        LOGGER.debug(f"Tokenizer size estimation: {total_size_bytes:,} bytes, {size_mb:.2f} MB.")
         return size_mb
 
     def get_special_tokens(self) -> Dict[str, int]:
@@ -183,7 +187,7 @@ class TokenizerConfig:
         Get mapping of special token names to their IDs.
         
         Returns:
-            Dict[str, int]: Special token name to ID mapping
+            Dict[str, int]: Special token name to ID mapping.
         """
         return {
             "bos": self.BOS_TOKEN_ID,
