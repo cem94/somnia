@@ -193,9 +193,9 @@ class HyperparameterOptimizer:
         # Attempt to load any previous optimization results
         self._load_existing_results()
         
-        LOGGER.info("Hyperparameter optimizer initialized successfully")
-        LOGGER.info(f"Maximum trials configured: {maximum_trials}")
-        LOGGER.info(f"Results will be saved to: {HYPERPARAMETERS_DIR}")
+        LOGGER.info("Hyperparameter optimizer initialized successfully.")
+        LOGGER.info(f"Maximum trials configured: {maximum_trials}.")
+        LOGGER.info(f"Results will be saved to: {HYPERPARAMETERS_DIR}.")
     
     def _load_existing_results(self) -> None:
         """
@@ -207,7 +207,7 @@ class HyperparameterOptimizer:
         results_file_path = os.path.join(HYPERPARAMETERS_DIR, "optimization_results.json")
         
         if not os.path.exists(results_file_path):
-            LOGGER.debug("No previous optimization results found")
+            LOGGER.debug("No previous optimization results found.")
             return
             
         try:
@@ -225,11 +225,11 @@ class HyperparameterOptimizer:
                 if stored_data.get('best_result'):
                     self.best_trial_result = HyperparameterTrialResult(**stored_data['best_result'])
                 
-                LOGGER.info(f"Loaded {len(self.trial_results)} previous optimization results")
+                LOGGER.info(f"Loaded {len(self.trial_results)} previous optimization results.")
                 
         except Exception as load_error:
-            LOGGER.error(f"Failed to load previous optimization results: {load_error}")
-            LOGGER.warning("Starting optimization from scratch")
+            LOGGER.error(f"Failed to load previous optimization results: {load_error}.")
+            LOGGER.warning("Starting optimization from scratch.")
     
     def _save_optimization_results(self) -> None:
         """
@@ -254,10 +254,10 @@ class HyperparameterOptimizer:
             with open(results_file_path, 'w', encoding='utf-8') as results_file:
                 json.dump(optimization_data, results_file, indent=2)
             
-            LOGGER.debug(f"Optimization results saved to {results_file_path}")
+            LOGGER.debug(f"Optimization results saved to {results_file_path}.")
             
         except Exception as save_error:
-            LOGGER.error(f"Failed to save optimization results: {save_error}")
+            LOGGER.error(f"Failed to save optimization results: {save_error}.")
     
     def _sample_targeted_hyperparameters(self) -> Dict[str, Any]:
         """
@@ -267,7 +267,7 @@ class HyperparameterOptimizer:
         ~80MB model size while varying training hyperparameters.
         
         Returns:
-            Dictionary of sampled hyperparameters with model size info
+            Dictionary of sampled hyperparameters with model size info.
         """
         # Select a model configuration
         model_config = random.choice(self.search_space.model_configs).copy()
@@ -289,8 +289,8 @@ class HyperparameterOptimizer:
         # Validate configuration
         validated_config = self.search_space.validate_hyperparameter_combination(sampled_config)
         
-        LOGGER.debug(f"Sampled configuration: {validated_config}")
-        LOGGER.debug(f"Estimated model size: {model_size:.1f} MB")
+        LOGGER.debug(f"Sampled configuration: {validated_config}.")
+        LOGGER.debug(f"Estimated model size: {model_size:.1f} MB.")
         
         return validated_config
     
@@ -312,8 +312,8 @@ class HyperparameterOptimizer:
         trial_start_time = time.time()
         
         try:
-            LOGGER.info(f"Starting optimization trial {trial_number}/{self.maximum_trials}: {trial_id}")
-            LOGGER.debug(f"Trial hyperparameters: {trial_hyperparameters}")
+            LOGGER.info(f"Starting optimization trial {trial_number}/{self.maximum_trials}: {trial_id}.")
+            LOGGER.debug(f"Trial hyperparameters: {trial_hyperparameters}.")
             
             # Configure trial-specific output directory
             trial_output_dir = os.path.join(HYPERPARAMETERS_DIR, trial_id)
@@ -330,7 +330,7 @@ class HyperparameterOptimizer:
             
             # Optimize trial configuration for hyperparameter search
             trial_config['log_interval'] = 50
-            trial_config['save_interval'] = 10000
+            trial_config['save_interval'] = 5000
             
             # Execute model training
             best_loss = train_model(trial_config)
@@ -349,11 +349,11 @@ class HyperparameterOptimizer:
             )
             
             if trial_successful:
-                LOGGER.info(f"Trial {trial_id} completed successfully")
-                LOGGER.info(f"Best validation loss: {best_loss:.4f}")
-                LOGGER.info(f"Training duration: {trial_duration/60:.1f} minutes")
+                LOGGER.info(f"Trial {trial_id} completed successfully.")
+                LOGGER.info(f"Best validation loss: {best_loss:.4f}.")
+                LOGGER.info(f"Training duration: {trial_duration/60:.1f} minutes.")
             else:
-                LOGGER.warning(f"Trial {trial_id} failed - infinite loss returned")
+                LOGGER.warning(f"Trial {trial_id} failed - infinite loss returned.")
             
             return trial_result
             
@@ -361,7 +361,7 @@ class HyperparameterOptimizer:
             trial_duration = time.time() - trial_start_time
             error_message = str(trial_error)
             
-            LOGGER.error(f"Trial {trial_id} failed with error: {error_message}")
+            LOGGER.error(f"Trial {trial_id} failed with error: {error_message}.")
             
             return HyperparameterTrialResult(
                 trial_identifier=trial_id,
@@ -373,7 +373,7 @@ class HyperparameterOptimizer:
             )
             
         except KeyboardInterrupt:
-            LOGGER.warning("Optimization interrupted by user")
+            LOGGER.warning("Optimization interrupted by user.")
             self._save_optimization_results()
             raise
     
@@ -387,17 +387,17 @@ class HyperparameterOptimizer:
         Returns:
             Best trial result found during optimization, or None if no trials succeeded
         """
-        LOGGER.info("Starting targeted hyperparameter optimization for ~80MB model")
-        LOGGER.info(f"Optimization strategy: Targeted search with {self.maximum_trials} trials")
+        LOGGER.info("Pipeline Stage 3: Starting targeted hyperparameter optimization for ~80MB model.")
+        LOGGER.info(f"Optimization strategy: Targeted search with {self.maximum_trials} trials.")
         
         optimization_start_time = time.time()
-        successful_trial_count = 0
 
         # Determine starting trial number (for continuation of interrupted runs)
         starting_trial = len(self.trial_results) + 1
+        successful_trial_count = starting_trial - 1
         
         if starting_trial > 1:
-            LOGGER.info(f"Continuing optimization from trial {starting_trial}")
+            LOGGER.info(f"Continuing optimization from trial {starting_trial}.")
         
         # Execute optimization trials
         for trial_number in range(starting_trial, self.maximum_trials + 1):
@@ -415,16 +415,16 @@ class HyperparameterOptimizer:
                 if (self.best_trial_result is None or 
                     trial_result.best_validation_loss < self.best_trial_result.best_validation_loss):
                     self.best_trial_result = trial_result
-                    LOGGER.info(f"New best configuration discovered!")
-                    LOGGER.info(f"Best validation loss: {trial_result.best_validation_loss:.4f}")
+                    LOGGER.info("New best configuration discovered!")
+                    LOGGER.info(f"Best validation loss: {trial_result.best_validation_loss:.4f}.")
             
             # Save intermediate results for recovery
             self._save_optimization_results()
             
             # Progress reporting
             elapsed_time = time.time() - optimization_start_time
-            LOGGER.info(f"Optimization progress: {trial_number}/{self.maximum_trials} trials completed")
-            LOGGER.info(f"Successful trials: {successful_trial_count}, Elapsed time: {elapsed_time/60:.1f} minutes")
+            LOGGER.info(f"Optimization progress: {trial_number}/{self.maximum_trials} trials completed.")
+            LOGGER.info(f"Successful trials: {successful_trial_count}, Elapsed time: {elapsed_time/60:.1f} minutes.")
         
         # Generate optimization summary
         total_optimization_time = time.time() - optimization_start_time
@@ -448,10 +448,10 @@ class HyperparameterOptimizer:
         LOGGER.info(f"Total optimization time: {total_time/60:.1f} minutes")
         
         if self.best_trial_result:
-            LOGGER.info(f"Best validation loss achieved: {self.best_trial_result.best_validation_loss:.4f}")
-            LOGGER.info(f"Best configuration: {self.best_trial_result.hyperparameter_config}")
+            LOGGER.info(f"Best validation loss achieved: {self.best_trial_result.best_validation_loss:.4f}.")
+            LOGGER.info(f"Best configuration: {self.best_trial_result.hyperparameter_config}.")
         else:
-            LOGGER.warning("No successful trials found during optimization")
+            LOGGER.warning("No successful trials found during optimization.")
     
     def execute_final_training(self, best_hyperparameters: Dict[str, Any]) -> float:
         """
@@ -470,18 +470,18 @@ class HyperparameterOptimizer:
         LOGGER.info("EXECUTING FINAL TRAINING WITH OPTIMAL CONFIGURATION")
         
         # Configure final training parameters
-        extended_epochs = 50
+        extended_epochs = 100
         final_training_config = best_hyperparameters.copy()
         final_training_config['epochs'] = extended_epochs
         final_training_config['out_dir'] = OUTPUT_DIR
         final_training_config['plot_out_dir'] = PLOT_OUTPUT_DIR
         
         # Enable full training features
-        final_training_config['log_interval'] = 10
+        final_training_config['log_interval'] = 20
         final_training_config['save_interval'] = 500
         
-        LOGGER.info(f"Final training configuration: {final_training_config}")
-        LOGGER.info(f"Extended training epochs: {extended_epochs}")
+        LOGGER.info(f"Final training configuration: {final_training_config}.")
+        LOGGER.info(f"Extended training epochs: {extended_epochs}.")
         
         # Execute final training
         final_training_start = time.time()
@@ -493,8 +493,8 @@ class HyperparameterOptimizer:
             # Log final training results
             LOGGER.info("=" * 50)
             LOGGER.info("FINAL TRAINING COMPLETED SUCCESSFULLY")
-            LOGGER.info(f"Final best validation loss: {final_best_loss:.4f}")
-            LOGGER.info(f"Final training duration: {final_training_duration/3600:.2f} hours")
+            LOGGER.info(f"Final best validation loss: {final_best_loss:.4f}.")
+            LOGGER.info(f"Final training duration: {final_training_duration/3600:.2f} hours.")
             
             # Save complete optimization results
             self._save_final_results(best_hyperparameters, final_best_loss, 
@@ -503,7 +503,7 @@ class HyperparameterOptimizer:
             return final_best_loss
             
         except Exception as final_training_error:
-            LOGGER.error(f"Final training failed: {final_training_error}")
+            LOGGER.error(f"Final training failed: {final_training_error}.")
             raise
     
     def _save_final_results(self, best_config: Dict[str, Any], final_loss: float, 
@@ -534,10 +534,10 @@ class HyperparameterOptimizer:
             with open(final_results_path, 'w', encoding='utf-8') as results_file:
                 json.dump(final_results_data, results_file, indent=2)
             
-            LOGGER.info(f"Final results saved to {final_results_path}")
+            LOGGER.info(f"Final results saved to {final_results_path}.")
             
         except Exception as save_error:
-            LOGGER.error(f"Failed to save final results: {save_error}")
+            LOGGER.error(f"Failed to save final results: {save_error}.")
 
 
 def main(skip_hyperparameter_search: bool = True) -> float:
@@ -555,24 +555,24 @@ def main(skip_hyperparameter_search: bool = True) -> float:
     """
     # Set random seed for reproducible optimization
     random.seed(TokenizerConfig.SEED)
-    LOGGER.info(f"Random seed set to {TokenizerConfig.SEED} for reproducible optimization")
+    LOGGER.info(f"Random seed set to {TokenizerConfig.SEED} for reproducible optimization.")
 
     try:
         if skip_hyperparameter_search:
-            LOGGER.info("Hyperparameter search skipped - using default configuration")
+            LOGGER.info("Hyperparameter search skipped - using default configuration.")
             return train_model()
 
         # Initialize and execute hyperparameter optimization
-        LOGGER.info("Initializing hyperparameter optimization system")
-        hyperparameter_optimizer = HyperparameterOptimizer(maximum_trials=8)
+        LOGGER.info("Initializing hyperparameter optimization system.")
+        hyperparameter_optimizer = HyperparameterOptimizer()
         
         # Execute optimization process
         best_optimization_result = hyperparameter_optimizer.execute_optimization()
 
         # Execute final training with best configuration
         if best_optimization_result is not None:
-            LOGGER.info("Proceeding with final training using optimal hyperparameters")
-            LOGGER.info(f"Optimal configuration: {best_optimization_result.hyperparameter_config}")
+            LOGGER.info("Proceeding with final training using optimal hyperparameters.")
+            LOGGER.info(f"Optimal configuration: {best_optimization_result.hyperparameter_config}.")
             
             final_loss = hyperparameter_optimizer.execute_final_training(
                 best_optimization_result.hyperparameter_config
@@ -580,10 +580,10 @@ def main(skip_hyperparameter_search: bool = True) -> float:
             
             return final_loss
         else:
-            LOGGER.error("No successful optimization trials found - cannot proceed with final training")
-            raise RuntimeError("Hyperparameter optimization failed to find viable configuration")
+            LOGGER.error("No successful optimization trials found - cannot proceed with final training.")
+            raise RuntimeError("Hyperparameter optimization failed to find viable configuration.")
     except Exception as error:
-        LOGGER.error(f"Hyperparameter optimization failed: {error}")
+        LOGGER.error(f"Hyperparameter optimization failed: {error}.")
 
 
 if __name__ == "__main__":

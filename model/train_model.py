@@ -33,6 +33,7 @@ from model.transformer.llama_config import LLamaConfig
 from model.transformer.tokenizer_config import TokenizerConfig
 from model.metrics import MetricsTracker
 from utility.logger import LOGGER
+from utility.paths import TOKENIZER_DIR
 
 # Ensure LLamaConfig global variable is safe for serialization
 torch.serialization.add_safe_globals([LLamaConfig])
@@ -47,13 +48,13 @@ def get_cosine_schedule_with_warmup(current_step: int, total_steps: int,
     Cosine annealing learning rate schedule with linear warmup.
     
     Args:
-        current_step: Current training step
-        total_steps: Total number of training steps
-        peak_lr: Peak learning rate after warmup
-        warmup_ratio: Fraction of total steps for warmup phase
+        current_step: Current training step.
+        total_steps: Total number of training steps.
+        peak_lr: Peak learning rate after warmup.
+        warmup_ratio: Fraction of total steps for warmup phase.
     
     Returns:
-        Current learning rate
+        Current learning rate.
     """
     warmup_steps = int(total_steps * warmup_ratio)
     
@@ -72,15 +73,14 @@ def load_checkpoint_if_exists(model: SomniaTransformer, optimizer: optim.Optimiz
     Load the latest checkpoint if it exists.
     
     Returns:
-        Tuple of (start_epoch, global_step, best_loss)
+        Tuple of (start_epoch, global_step, best_loss).
     """
-    checkpoint_dir = config.out_dir
-    checkpoint_path = os.path.join(checkpoint_dir, 'model_checkpoint.pt')
+    checkpoint_path = os.path.join(config.out_dir, config.CHECKPOINT_NAME)
     
     if not os.path.exists(checkpoint_path):
         return 0, 0, float('inf')
     
-    LOGGER.info(f"Loading checkpoint from {checkpoint_path}")
+    LOGGER.info(f"Loading checkpoint from {checkpoint_path}.")
 
     model_loaded, checkpoint_info = SomniaTransformer.load_checkpoint(
         checkpoint_path, map_location=config.device
@@ -100,19 +100,19 @@ def load_checkpoint_if_exists(model: SomniaTransformer, optimizer: optim.Optimiz
 def save_checkpoint_and_plots(model: SomniaTransformer, optimizer: optim.Optimizer, 
                             metrics: MetricsTracker, config: LLamaConfig, 
                             epoch: int, step: int, loss: float, 
-                            checkpoint_name: str = "llama_model.pt") -> None:
+                            checkpoint_name: str = LLamaConfig.CHECKPOINT_NAME) -> None:
     """
     Save model checkpoint and training plots.
     
     Args:
-        model: The transformer model
-        optimizer: The optimizer
-        metrics: Training metrics object
-        config: Training configuration
-        epoch: Current epoch
-        step: Current step
-        loss: Current loss
-        checkpoint_name: Name for the checkpoint file
+        model: The transformer model.
+        optimizer: The optimizer.
+        metrics: Training metrics object.
+        config: Training configuration.
+        epoch: Current epoch.
+        step: Current step.
+        loss: Current loss.
+        checkpoint_name: Name for the checkpoint file.
     """
     checkpoint_path = os.path.join(config.out_dir, checkpoint_name)
     
@@ -130,7 +130,7 @@ def save_checkpoint_and_plots(model: SomniaTransformer, optimizer: optim.Optimiz
     )
     
     metrics.save_plots_and_metrics(config.plot_out_dir)
-    LOGGER.debug(f"Checkpoint and plots saved to {checkpoint_path}")
+    LOGGER.debug(f"Checkpoint and plots saved to {checkpoint_path}.")
 
 
 def _estimate_time_remaining(start_time: float, current_step: int, total_steps: int) -> str:
@@ -158,26 +158,45 @@ def _estimate_time_remaining(start_time: float, current_step: int, total_steps: 
     return f"{hours:02d}h:{minutes:02d}m"
 
 
-def train_model(model: SomniaTransformer, train_loader: DataLoader, config: LLamaConfig) -> MetricsTracker:
+def _load_tokenizer(tokenizer_path: str = TOKENIZER_DIR) -> Any:
+    """
+    Load the tokenizer from the specified path.
+    
+    Args:
+        tokenizer_path: Path to the tokenizer directory.
+        
+    Returns:
+        Loaded tokenizer object.
+    """
+    from transformers import AutoTokenizer
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, local_files_only=True)
+        LOGGER.info(f"Tokenizer loaded successfully from {tokenizer_path}.")
+        return tokenizer
+    except Exception as error:
+        LOGGER.error(f"Failed to load tokenizer from {tokenizer_path}: {error}.")
+        raise
+
+
+def train_model(model: SomniaTransformer, train_loader: DataLoader, tokenizer, config: LLamaConfig) -> MetricsTracker:
     """
     Train the transformer model on the given dataset and configuration.
     
     Args:
-        model: The transformer model to train
-        train_loader: DataLoader for training data
-        config: Training configuration
+        model: The transformer model to train.
+        train_loader: DataLoader for training data.
+        tokenizer: Tokenizer for text processing.
+        config: Training configuration.
     
     Returns:
-        MetricsTracker object containing training history
+        MetricsTracker object containing training history.
     """
-    LOGGER.info("Starting model training")
+    LOGGER.info("Pipeline Stage 3: Starting model training.")
     
     # Initialize training components
-    model.train()
-    device = config.device
-    loss_fn = nn.CrossEntropyLoss(reduction='none')
-    ctx = nullcontext() if device == "cpu" else torch.cuda.amp.autocast()
-    scaler = torch.cuda.amp.GradScaler(enabled=(config.dtype in ['float16', 'bfloat16']))
+    loss_function = nn.CrossEntropyLoss(reduction='none')
+    autocast_context = nullcontext() if config.device == "cpu" else torch.cuda.amp.autocast()
+    gradient_scaler = torch.cuda.amp.GradScaler(enabled=(config.dtype in ['float16', 'bfloat16']))
 
     optimizer = optim.AdamW(
         model.parameters(), 
@@ -187,158 +206,163 @@ def train_model(model: SomniaTransformer, train_loader: DataLoader, config: LLam
         eps=1e-8
     )
         
-    metrics = MetricsTracker(config.plot_out_dir)
+    metrics_tracker = MetricsTracker(config.plot_out_dir)
     
     # Load checkpoint if exists
     start_epoch, global_step, best_loss = load_checkpoint_if_exists(model, optimizer, config)    
     steps_per_epoch = len(train_loader)
-    total_steps = config.epochs * steps_per_epoch
-    remaining_steps = total_steps - global_step
+    total_training_steps = config.epochs * steps_per_epoch
     
-    LOGGER.info(f"Training configuration: {config.epochs} epochs, {steps_per_epoch} steps per epoch")
-    LOGGER.info(f"Total training steps: {total_steps}, starting from step: {global_step}")
-    LOGGER.debug(f"Gradient accumulation steps: {config.accumulation_steps}")
+    LOGGER.info(f"Training configuration: {config.epochs} epochs, {steps_per_epoch} steps per epoch.")
+    LOGGER.info(f"Total training steps: {total_training_steps}, starting from step: {global_step}.")
+    LOGGER.debug(f"Gradient accumulation steps: {config.accumulation_steps}.")
     
-    start_time = time.time()
+    # Start training loop
+    training_start_time = time.time()
     
     try:
-        for epoch in range(start_epoch, config.epochs):
+        for current_epoch in range(start_epoch, config.epochs):
+            model.train()
             epoch_start_time = time.time()
-            epoch_loss = 0.0
+            epoch_total_loss = 0.0
             
-            LOGGER.info(f"Starting epoch {epoch + 1}/{config.epochs}")
+            LOGGER.info(f"Starting epoch {current_epoch + 1}/{config.epochs}.")
             
-            for step, batch in enumerate(train_loader):
+            for batch_step, training_batch in enumerate(train_loader):
                 # Skip steps if resuming from checkpoint
-                current_step_in_epoch = epoch * steps_per_epoch + step
+                current_step_in_epoch = current_epoch * steps_per_epoch + batch_step
                 if current_step_in_epoch < global_step:
                     continue
                     
                 # Move data to device
-                input_ids = batch["input_ids"].to(device, non_blocking=True)
-                labels = batch["labels"].to(device, non_blocking=True)
-                attention_mask = batch["attention_mask"].to(device, non_blocking=True)
+                input_token_ids = training_batch["input_ids"].to(config.device, non_blocking=True)
+                target_labels = training_batch["labels"].to(config.device, non_blocking=True)
+                attention_mask = training_batch["attention_mask"].to(config.device, non_blocking=True)
                 
                 # Update learning rate with cosine schedule
-                current_lr = get_cosine_schedule_with_warmup(global_step, total_steps, config.learning_rate)
-                optimizer.param_groups[0]['lr'] = current_lr
+                current_learning_rate = get_cosine_schedule_with_warmup(global_step, total_training_steps, config.learning_rate)
+                optimizer.param_groups[0]['lr'] = current_learning_rate
 
                 # Forward pass with mixed precision
-                with ctx:
-                    outputs = model(input_ids=input_ids)
-                    logits = outputs.logits
+                with autocast_context:
+                    model_outputs = model(input_ids=input_token_ids)
+                    output_logits = model_outputs.logits
                     
-                    # Calculate loss with proper masking
-                    shift_logits = logits[..., :-1, :].contiguous()
-                    shift_labels = labels[..., 1:].contiguous()
-                    shift_mask = attention_mask[..., 1:].contiguous()
+                    # Calculate loss with proper masking for next token prediction
+                    shifted_logits = output_logits[..., :-1, :].contiguous()
+                    shifted_labels = target_labels[..., 1:].contiguous()
+                    shifted_attention_mask = attention_mask[..., 1:].contiguous()
                     
-                    loss = loss_fn(
-                        shift_logits.view(-1, shift_logits.size(-1)), 
-                        shift_labels.view(-1)
-                    ).view(shift_labels.size())
+                    token_losses = loss_function(
+                        shifted_logits.view(-1, shifted_logits.size(-1)), 
+                        shifted_labels.view(-1)
+                    ).view(shifted_labels.size())
                     
                     # Apply attention mask and normalize
-                    masked_loss = (loss * shift_mask).sum() / shift_mask.sum()
-                    scaled_loss = masked_loss / config.accumulation_steps
+                    masked_loss = (token_losses * shifted_attention_mask).sum() / shifted_attention_mask.sum()
+                    scaled_loss_for_accumulation = masked_loss / config.accumulation_steps
                 
                 # Backward pass
-                scaler.scale(scaled_loss).backward()
-                epoch_loss += masked_loss.item()
+                gradient_scaler.scale(scaled_loss_for_accumulation).backward()
+                epoch_total_loss += masked_loss.item()
+                
+                # Update best loss tracking BEFORE accumulation check
+                current_loss_value = masked_loss.item()
+                if current_loss_value < best_loss:
+                    best_loss = current_loss_value
+                    LOGGER.debug(f"New best loss: {best_loss:.4f} at step {global_step}.")
                 
                 # Optimization step with gradient accumulation
-                if (step + 1) % config.accumulation_steps == 0:
+                if (batch_step + 1) % config.accumulation_steps == 0:
                     # Unscale gradients for clipping
-                    scaler.unscale_(optimizer)
+                    gradient_scaler.unscale_(optimizer)
                     
                     # Calculate gradient norm before clipping
-                    grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
+                    gradient_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
                     
                     # Optimizer step
-                    scaler.step(optimizer)
-                    scaler.update()
+                    gradient_scaler.step(optimizer)
+                    gradient_scaler.update()
                     optimizer.zero_grad(set_to_none=True)
                     
                     # Record metrics
-                    metrics.add_metrics(
+                    metrics_tracker.add_metrics(
                         step=global_step,
-                        epoch=epoch,
-                        loss=masked_loss.item(),
-                        lr=current_lr,
-                        grad_norm=grad_norm.item() if torch.is_tensor(grad_norm) else grad_norm
-                    )
-                else:
-                    # Record metrics even without optimizer step for tracking
-                    metrics.add_metrics(
-                        step=global_step,
-                        epoch=epoch,
-                        loss=masked_loss.item(),
-                        lr=current_lr,
-                        grad_norm=float('nan')
+                        epoch=current_epoch,
+                        loss=current_loss_value,
+                        lr=current_learning_rate,
+                        grad_norm=gradient_norm.item() if torch.is_tensor(gradient_norm) else gradient_norm
                     )
                 
                 global_step += 1
                 
-                if masked_loss.item() < best_loss:
-                    best_loss = masked_loss.item()
-                
                 # Progress logging
-                if step % config.log_interval == 0:
-                    elapsed = time.time() - start_time
-                    time_remaining = _estimate_time_remaining(start_time, global_step, total_steps)
+                if batch_step % config.log_interval == 0:
+                    elapsed_training_time = time.time() - training_start_time
+                    estimated_time_remaining = _estimate_time_remaining(training_start_time, global_step, total_training_steps)
+                    current_perplexity = math.exp(min(current_loss_value, 10))
                     
                     LOGGER.info(
-                        f"Epoch {epoch+1:2d}/{config.epochs} | "
-                        f"Step {step:4d}/{steps_per_epoch} | "
-                        f"Loss: {masked_loss.item():.4f} | "
-                        f"Perplexity: {math.exp(min(masked_loss.item(), 10)):.2f} | "
-                        f"LR: {current_lr:.2e} | "
-                        f"Time: {elapsed/60:.1f}m | "
-                        f"ETA: {time_remaining}"
+                        f"Epoch {current_epoch+1:2d}/{config.epochs} | "
+                        f"Step {batch_step:4d}/{steps_per_epoch} | "
+                        f"Loss: {current_loss_value:.4f} | "
+                        f"Perplexity: {current_perplexity:.2f} | "
+                        f"LR: {current_learning_rate:.2e} | "
+                        f"Time: {elapsed_training_time/60:.1f}m | "
+                        f"ETA: {estimated_time_remaining}"
                     )
                 
-                # Checkpoint saving
-                if (global_step) % config.save_interval == 0 and global_step > 0:
+                # Periodic checkpoint saving
+                if (global_step) % config.save_interval == 0:
                     save_checkpoint_and_plots(
                         model=model,
                         optimizer=optimizer,
-                        metrics=metrics,
+                        metrics=metrics_tracker,
                         config=config,
-                        epoch=epoch,
+                        epoch=current_epoch,
                         step=global_step,
-                        loss=masked_loss.item()
+                        loss=current_loss_value
                     )
             
             # End of epoch summary
-            epoch_time = time.time() - epoch_start_time
-            avg_epoch_loss = epoch_loss / len(train_loader)
+            epoch_duration = time.time() - epoch_start_time
+            average_epoch_loss = epoch_total_loss / len(train_loader)
+            epoch_perplexity = math.exp(min(average_epoch_loss, 10))
+
+            # Generate sample text after each epoch
+            generate_sample_text(model, tokenizer, config.device)
+
+            # Clear CUDA cache to free memory
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                LOGGER.debug("Cleared CUDA cache after epoch completion.")
             
-            LOGGER.info(f"Epoch {epoch+1} completed: avg loss {avg_epoch_loss:.4f}, "
-                       f"perplexity {math.exp(min(avg_epoch_loss, 10)):.2f}, "
-                       f"time {epoch_time/60:.1f}m")
+            LOGGER.info(f"Epoch {current_epoch+1} completed: avg loss {average_epoch_loss:.4f}, "
+                       f"perplexity {epoch_perplexity:.2f}, "
+                       f"time {epoch_duration/60:.1f}m.")
     
     except KeyboardInterrupt:
-        LOGGER.info("Training interrupted by user")
+        LOGGER.info("Training interrupted by user.")
         raise
-    except Exception as e:
-        LOGGER.error(f"Training error: {e}")
+    except Exception as training_error:
+        LOGGER.error(f"Training error: {training_error}.")
         raise
     finally:
         # Save final checkpoint and plots
         save_checkpoint_and_plots(
             model=model,
             optimizer=optimizer,
-            metrics=metrics,
+            metrics=metrics_tracker,
             config=config,
-            epoch=epoch,
+            epoch=current_epoch if 'current_epoch' in locals() else 0,
             step=global_step,
             loss=best_loss
         )
         
-        total_time = time.time() - start_time
-        LOGGER.info(f"Training completed in {total_time/3600:.2f} hours")
+        total_training_time = time.time() - training_start_time
+        LOGGER.info(f"Training completed in {total_training_time/3600:.2f} hours.")
     
-    return metrics
+    return metrics_tracker
 
 
 def generate_sample_text(model: SomniaTransformer, tokenizer, device: str) -> None:
@@ -346,59 +370,59 @@ def generate_sample_text(model: SomniaTransformer, tokenizer, device: str) -> No
     Generate sample text to evaluate model performance.
     
     Args:
-        model: The trained transformer model
-        tokenizer: Tokenizer for text processing
-        device: Device to run inference on
+        model: The trained transformer model.
+        tokenizer: Tokenizer for text processing.
+        device: Device to run inference on.
     """
     test_prompts = [
         "Once upon a time",
-        "In a kingdom far away",
+        "In a kingdom far away", 
         "There lived a brave princess",
         ""  # Empty prompt test
     ]
     
     model.eval()
-    LOGGER.info("Generating sample text outputs")
+    LOGGER.info("Generating sample text outputs.")
     
     with torch.no_grad():
-        for i, prompt in enumerate(test_prompts, 1):
-            LOGGER.debug(f"Sample {i} with prompt: '{prompt}'" if prompt else "Sample with empty prompt")
+        for prompt_index, test_prompt in enumerate(test_prompts, 1):
+            LOGGER.debug(f"Sample {prompt_index} with prompt: '{test_prompt}'" if test_prompt else "Sample with empty prompt.")
             
             try:
-                if not prompt:  # BOS token
-                    input_ids = torch.tensor([[TokenizerConfig.BOS_TOKEN_ID]], device=device)
+                if not test_prompt:  # BOS token
+                    input_token_ids = torch.tensor([[TokenizerConfig.BOS_TOKEN_ID]], device=device)
                 else:
-                    input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+                    input_token_ids = tokenizer(test_prompt, return_tensors="pt").input_ids.to(device)
                 
-                generated_ids = model.generate(
-                    input_ids=input_ids,
-                    max_new_tokens=min(200, TokenizerConfig.MAX_SEQ_LEN - input_ids.size(1)),
+                generated_token_ids = model.generate(
+                    input_ids=input_token_ids,
+                    max_new_tokens=min(200, TokenizerConfig.MAX_SEQ_LEN - input_token_ids.size(1)),
                     temperature=0.8,
                     top_p=0.9,
                     repetition_penalty=1.1,
                     use_cache=True
                 )
                 
-                generated_text = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
+                generated_text = tokenizer.decode(generated_token_ids[0], skip_special_tokens=True)
                 LOGGER.info(f"Generated: {generated_text}")
                 
-            except Exception as e:
-                LOGGER.error(f"Error generating text for prompt '{prompt}': {e}")
-                raise
+            except Exception as generation_error:
+                LOGGER.error(f"Error generating text for prompt '{test_prompt}': {generation_error}.")
+                continue
     
 
-def main(hyperparams: Optional[Dict[str, Any]] = None) -> float:
+def main(hyperparameters: Optional[Dict[str, Any]] = None) -> float:
     """
     Main training function that accepts hyperparameters and returns best score.
     
     Args:
-        hyperparams: Dictionary of hyperparameters to override default config.
-                    If None, uses default configuration.
+        hyperparameters: Dictionary of hyperparameters to override default config.
+                        If None, uses default configuration.
     
     Returns:
-        Best loss achieved during training
+        Best loss achieved during training.
     """
-    LOGGER.info("Starting Somnia Transformer training")
+    LOGGER.info("Pipeline Stage 3: Starting Somnia Transformer training.")
     
     # Set random seeds for reproducibility
     torch.manual_seed(TokenizerConfig.SEED)
@@ -407,78 +431,65 @@ def main(hyperparams: Optional[Dict[str, Any]] = None) -> float:
         torch.cuda.manual_seed_all(TokenizerConfig.SEED)
     
     # Initialize configuration
-    config = LLamaConfig()
+    training_config = LLamaConfig()
     
     # Override with provided hyperparameters
-    if hyperparams:
-        for key, value in hyperparams.items():
-            if hasattr(config, key):
-                setattr(config, key, value)
-                LOGGER.debug(f"Set {key} = {value}")
+    if hyperparameters:
+        for parameter_name, parameter_value in hyperparameters.items():
+            if hasattr(training_config, parameter_name):
+                setattr(training_config, parameter_name, parameter_value)
+                LOGGER.debug(f"Set {parameter_name} = {parameter_value}.")
             else:
-                LOGGER.warning(f"Unknown hyperparameter: {key}")
+                LOGGER.warning(f"Unknown hyperparameter: {parameter_name}.")
     
     # Create output directory
-    os.makedirs(config.out_dir, exist_ok=True)
+    os.makedirs(training_config.out_dir, exist_ok=True)
     
     # Initialize model
-    LOGGER.info("Initializing transformer model")
-    model = SomniaTransformer(config).to(config.device)
+    LOGGER.info("Initializing transformer model.")
+    transformer_model = SomniaTransformer(training_config).to(training_config.device)
     
     # Log model information
-    total_params = model.get_num_parameters(only_trainable=True)
-    memory_usage = model.get_memory_usage()
+    total_parameters = transformer_model.get_num_parameters(only_trainable=True)
+    memory_usage_info = transformer_model.get_memory_usage()
     
-    LOGGER.info(f"Model initialized: {total_params/1e6:.3f}M parameters, "
-               f"{memory_usage['total_mb']:.2f} MB memory usage")
-    LOGGER.debug(f"Training device: {config.device}, mixed precision: {config.dtype}")
+    LOGGER.info(f"Model initialized: {total_parameters/1e6:.3f}M parameters, "
+               f"{memory_usage_info['total_mb']:.2f} MB memory usage.")
+    LOGGER.debug(f"Training device: {training_config.device}, mixed precision: {training_config.dtype}.")
     
-    # Initialize dataset and dataloader
-    LOGGER.info("Loading training dataset")
-    train_dataset = FairyTaleDataset()
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=config.batch_size,
+
+    # Load tokenizer
+    text_tokenizer = _load_tokenizer()
+
+    # Initialize dataset and dataloader with tokenizer
+    LOGGER.info("Loading training dataset.")
+    training_dataset = FairyTaleDataset(text_tokenizer)
+    training_dataloader = DataLoader(
+        training_dataset,
+        batch_size=training_config.batch_size,
         shuffle=True,
         pin_memory=True,
         drop_last=False,
         num_workers=0  # Avoid multiprocessing issues
     )
     
-    LOGGER.info(f"Dataset loaded: {len(train_dataset)} samples, "
-               f"batch size {config.batch_size}, "
-               f"{len(train_loader)} batches per epoch")
+    LOGGER.info(f"Dataset loaded: {len(training_dataset)} samples, "
+               f"batch size {training_config.batch_size}, "
+               f"{len(training_dataloader)} batches per epoch.")
     
     # Train the model
-    training_metrics = train_model(model, train_loader, config)
+    training_metrics = train_model(transformer_model, training_dataloader, text_tokenizer, training_config)
     
-    # Calculate best loss
-    best_loss = min(training_metrics.losses) if training_metrics.losses else float('inf')
+    # Calculate best loss from metrics instead of tracking variable
+    if training_metrics.losses:
+        best_training_loss = min(training_metrics.losses)
+        LOGGER.info(f"Best loss from metrics: {best_training_loss:.4f}.")
+    else:
+        best_training_loss = float('inf')
+        LOGGER.warning("No metrics recorded during training.")
     
-    # Generate sample outputs for full training
-    if not hyperparams or config.epochs > 5:
-        generate_sample_text(model, train_dataset.tokenizer, config.device)
-        
-        # Save training summary
-        summary_path = os.path.join(config.out_dir, "training_summary.txt")
-        with open(summary_path, 'w') as f:
-            f.write("SOMNIA TRANSFORMER TRAINING SUMMARY\n")
-            f.write("="*50 + "\n\n")
-            f.write(f"Model Parameters: {total_params/1e6:.3f}M\n")
-            f.write(f"Training Samples: {len(train_dataset)}\n")
-            f.write(f"Epochs: {config.epochs}\n")
-            f.write(f"Batch Size: {config.batch_size}\n")
-            f.write(f"Learning Rate: {config.learning_rate}\n")
-            f.write(f"Best Loss: {best_loss:.4f}\n")
-            
-            if training_metrics.losses:
-                f.write(f"Final Loss: {training_metrics.losses[-1]:.4f}\n")
-                f.write(f"Final Perplexity: {training_metrics.perplexities[-1]:.2f}\n")
-        
-        LOGGER.info(f"Training summary saved to {summary_path}")
-    
-    LOGGER.info(f"Training completed successfully, best loss: {best_loss:.4f}")
-    return best_loss
+    LOGGER.info(f"Pipeline Stage 3 completed successfully. Best loss: {best_training_loss:.4f}.")
+    return best_training_loss
 
 
 if __name__ == "__main__":

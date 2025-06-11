@@ -6,7 +6,6 @@ including all hyperparameters, training settings, and model architecture
 parameters.
 """
 
-import torch
 from transformers import PretrainedConfig
 from model.transformer.tokenizer_config import TokenizerConfig
 from utility.paths import TOKENIZER_DIR, OUTPUT_DIR, PLOT_OUTPUT_DIR, PROCESSED_OUTPUT_FILE
@@ -57,6 +56,9 @@ class LLamaConfig(PretrainedConfig):
     """
 
     model_type = "transformerlm"
+    
+    # Global
+    CHECKPOINT_NAME = "model_checkpoint.pt"
 
     def __init__(self, 
                  # Architecture parameters
@@ -72,14 +74,17 @@ class LLamaConfig(PretrainedConfig):
                  flash_attn: bool = True,
                  
                  # Training parameters
-                 epochs: int = 5,
+                 epochs: int = 15,
                  batch_size: int = 8,
                  learning_rate: float = 5e-4,
                  accumulation_steps: int = 8,
                  grad_clip: float = 1.0,
                  warmup_iters: int = 0,
-                 log_interval: int = 10,
-                 save_interval: int = 10):
+                 log_interval: int = 20,
+                 save_interval: int = 500,
+                 
+                 # System parameters
+                 device: str = 'cpu'):
         """
         Initialize the LLaMA configuration.
 
@@ -100,11 +105,14 @@ class LLamaConfig(PretrainedConfig):
             epochs (int): Number of training epochs (default: 5)
             batch_size (int): Training batch size (default: 8)
             learning_rate (float): Learning rate (default: 5e-4)
-            accumulation_steps (int): Gradient accumulation steps (default: 8)
+            accumulation_steps (int): Gradient accumulation steps (default: 20)
             grad_clip (float): Gradient clipping value (default: 1.0)
             warmup_iters (int): Warmup iterations (default: 0)
-            log_interval (int): Logging interval (default: 10)
-            save_interval (int): Save interval (default: 10)
+            log_interval (int): Logging interval (default: 50)
+            save_interval (int): Save interval (default: 50)
+            
+            # System parameters
+            device (str): Device to use for training (default: cpu)
         """
         # Set architecture parameters
         self.dim = dim
@@ -131,7 +139,8 @@ class LLamaConfig(PretrainedConfig):
         self.save_interval = save_interval
         
         # Set system parameters
-        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self.device = device
+            
         self.dtype = "bfloat16"
         self.out_dir = OUTPUT_DIR
         self.plot_out_dir = PLOT_OUTPUT_DIR
@@ -146,37 +155,39 @@ class LLamaConfig(PretrainedConfig):
 
     def _validate_configuration(self) -> None:
         """Validate the configuration parameters."""
-        LOGGER.debug("Starting configuration validation...")
+        LOGGER.debug("Starting configuration validation.")
         
         # Validate architecture parameters
-        assert self.dim > 0, f"Embedding dimension must be positive, got {self.dim}"
-        assert self.n_layers > 0, f"Number of layers must be positive, got {self.n_layers}"
-        assert self.n_heads > 0, f"Number of heads must be positive, got {self.n_heads}"
-        assert self.dim % self.n_heads == 0, f"Embedding dimension ({self.dim}) must be divisible by number of heads ({self.n_heads})"
+        assert self.dim > 0, f"Embedding dimension must be positive, got {self.dim}."
+        assert self.n_layers > 0, f"Number of layers must be positive, got {self.n_layers}."
+        assert self.n_heads > 0, f"Number of heads must be positive, got {self.n_heads}."
+        assert self.dim % self.n_heads == 0, f"Embedding dimension ({self.dim}) must be divisible by number of heads ({self.n_heads})."
         
-        # Fixed validation for n_kv_heads
+        # Validate n_kv_heads and divisibility for grouped-query attention
         assert self.n_kv_heads > 0 and self.n_kv_heads <= self.n_heads, \
-            f"Number of KV heads ({self.n_kv_heads}) must be positive and <= number of heads ({self.n_heads})"
+            f"Number of KV heads ({self.n_kv_heads}) must be positive and <= number of heads ({self.n_heads})."
+        assert self.n_heads % self.n_kv_heads == 0, \
+            f"Number of heads ({self.n_heads}) must be divisible by number of KV heads ({self.n_kv_heads})."
         
-        assert self.vocab_size > 0, f"Vocabulary size must be positive, got {self.vocab_size}"
-        assert self.max_seq_len > 0, f"Max sequence length must be positive, got {self.max_seq_len}"
-        assert self.norm_eps > 0, f"Norm epsilon must be positive, got {self.norm_eps}"
-        assert 0.0 <= self.dropout <= 1.0, f"Dropout must be between 0 and 1, got {self.dropout}"
+        assert self.vocab_size > 0, f"Vocabulary size must be positive, got {self.vocab_size}."
+        assert self.max_seq_len > 0, f"Max sequence length must be positive, got {self.max_seq_len}."
+        assert self.norm_eps > 0, f"Norm epsilon must be positive, got {self.norm_eps}."
+        assert 0.0 <= self.dropout <= 1.0, f"Dropout must be between 0 and 1, got {self.dropout}."
         
-        LOGGER.debug("Architecture parameters validated successfully")
+        LOGGER.debug("Architecture parameters validated successfully.")
         
         # Validate training parameters
-        assert self.learning_rate > 0, f"Learning rate must be positive, got {self.learning_rate}"
-        assert self.batch_size > 0, f"Batch size must be positive, got {self.batch_size}"
-        assert self.epochs > 0, f"Number of epochs must be positive, got {self.epochs}"
-        assert self.accumulation_steps > 0, f"Accumulation steps must be positive, got {self.accumulation_steps}"
-        assert self.grad_clip > 0, f"Gradient clipping must be positive, got {self.grad_clip}"
-        assert self.log_interval > 0, f"Log interval must be positive, got {self.log_interval}"
-        assert self.save_interval > 0, f"Save interval must be positive, got {self.save_interval}"
+        assert self.learning_rate > 0, f"Learning rate must be positive, got {self.learning_rate}."
+        assert self.batch_size > 0, f"Batch size must be positive, got {self.batch_size}."
+        assert self.epochs > 0, f"Number of epochs must be positive, got {self.epochs}."
+        assert self.accumulation_steps > 0, f"Accumulation steps must be positive, got {self.accumulation_steps}."
+        assert self.grad_clip > 0, f"Gradient clipping must be positive, got {self.grad_clip}."
+        assert self.log_interval > 0, f"Log interval must be positive, got {self.log_interval}."
+        assert self.save_interval > 0, f"Save interval must be positive, got {self.save_interval}."
         
-        LOGGER.debug("Training parameters validated successfully")
-        
-        LOGGER.info("Configuration validation completed successfully")
+        LOGGER.debug("Training parameters validated successfully.")
+                    
+        LOGGER.info("Configuration validation completed successfully.")
             
 
     def estimate_model_size_mb(self) -> float:
@@ -187,7 +198,7 @@ class LLamaConfig(PretrainedConfig):
         and estimates the size based on 4 bytes per parameter (float32).
         
         Returns:
-            float: Estimated model size in MB
+            float: Estimated model size in MB.
         """
         # Embedding parameters
         embedding_params = self.vocab_size * self.dim
@@ -228,7 +239,7 @@ class LLamaConfig(PretrainedConfig):
         # Estimate size in MB (4 bytes per parameter for float32)
         size_mb = (total_params * 4) / (1024 * 1024)
         
-        LOGGER.debug(f"Model size estimation: {total_params:,} parameters, {size_mb:.1f} MB")
+        LOGGER.debug(f"Model size estimation: {total_params:,} parameters, {size_mb:.1f} MB.")
         return size_mb
        
     

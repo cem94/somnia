@@ -426,13 +426,13 @@ class SomniaTransformer(PreTrainedModel):
         Save model checkpoint with training state.
 
         Args:
-            checkpoint_path: Path to save checkpoint
-            epoch: Current training epoch
-            step: Current training step
-            optimizer_state: Optimizer state dict
-            scheduler_state: Learning rate scheduler state dict
-            loss: Current training loss
-            metadata: Additional metadata to save
+            checkpoint_path: Path to save checkpoint.
+            epoch: Current training epoch.
+            step: Current training step.
+            optimizer_state: Optimizer state dict.
+            scheduler_state: Learning rate scheduler state dict.
+            loss: Current training loss.
+            metadata: Additional metadata to save.
         """
         os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
         
@@ -452,7 +452,7 @@ class SomniaTransformer(PreTrainedModel):
             checkpoint['scheduler_state_dict'] = scheduler_state
         
         torch.save(checkpoint, checkpoint_path)
-        LOGGER.info(f"Checkpoint saved to {checkpoint_path} at epoch {epoch}, step {step}")
+        LOGGER.info(f"Checkpoint saved to {checkpoint_path} at epoch {epoch}, step {step}.")
 
     @classmethod
     def load_checkpoint(cls, 
@@ -462,12 +462,12 @@ class SomniaTransformer(PreTrainedModel):
         Load model from checkpoint.
 
         Args:
-            checkpoint_path: Path to checkpoint file
-            map_location: Device to load checkpoint on
+            checkpoint_path: Path to checkpoint file.
+            map_location: Device to load checkpoint on.
 
         Returns:
             Tuple of (model, checkpoint_info) where checkpoint_info contains
-            training state information
+            training state information.
         """
         checkpoint = torch.load(checkpoint_path, map_location=map_location, weights_only=False)
         
@@ -486,8 +486,8 @@ class SomniaTransformer(PreTrainedModel):
             'metadata': checkpoint.get('metadata', {})
         }
         
-        LOGGER.info(f"Model loaded from checkpoint {checkpoint_path}")
-        LOGGER.debug(f"Checkpoint info: epoch {checkpoint_info['epoch']}, step {checkpoint_info['step']}")
+        LOGGER.info(f"Model loaded from checkpoint {checkpoint_path}.")
+        LOGGER.debug(f"Checkpoint info: epoch {checkpoint_info['epoch']}, step {checkpoint_info['step']}.")
         
         return model, checkpoint_info
 
@@ -504,26 +504,26 @@ class SomniaTransformer(PreTrainedModel):
         Generate text using various sampling strategies.
 
         Args:
-            input_ids: Input prompt tokens [batch, seq_len]
-            max_new_tokens: Maximum number of new tokens to generate
-            temperature: Sampling temperature (higher = more random)
-            top_p: Nucleus sampling probability threshold
-            repetition_penalty: Penalty for repeating tokens
-            use_cache: Whether to use KV caching for efficiency
+            input_ids: Input prompt tokens [batch, seq_len].
+            max_new_tokens: Maximum number of new tokens to generate.
+            temperature: Sampling temperature (higher = more random).
+            top_p: Nucleus sampling probability threshold.
+            repetition_penalty: Penalty for repeating tokens.
+            use_cache: Whether to use KV caching for efficiency.
 
         Returns:
-            torch.Tensor: Generated token sequence [batch, seq_len + new_tokens]
+            torch.Tensor: Generated token sequence [batch, seq_len + new_tokens].
         """
         # Validate parameters
-        assert temperature > 0.0, "Temperature must be positive"
-        assert 0.0 < top_p <= 1.0, "Top-p must be between 0 and 1"
-        assert repetition_penalty >= 1.0, "Repetition penalty must be >= 1.0"
+        assert temperature > 0.0, "Temperature must be positive."
+        assert 0.0 < top_p <= 1.0, "Top-p must be between 0 and 1."
+        assert repetition_penalty >= 1.0, "Repetition penalty must be >= 1.0."
         
         # Initialize generation variables
         generated_ids = input_ids.clone()
         past_key_values = None
         
-        LOGGER.debug(f"Starting text generation: max_tokens={max_new_tokens}, temperature={temperature}")
+        LOGGER.debug(f"Starting text generation: max_tokens={max_new_tokens}, temperature={temperature}.")
         
         # Generation loop
         for step in range(max_new_tokens):
@@ -562,13 +562,17 @@ class SomniaTransformer(PreTrainedModel):
             
             # Check for EOS token
             if (next_token == TokenizerConfig.EOS_TOKEN_ID).any():
-                LOGGER.debug(f"Generation stopped at step {step} due to EOS token")
+                LOGGER.debug(f"Generation stopped at step {step} due to EOS token.")
                 break
             
             # Append to generated sequence
             generated_ids = torch.cat([generated_ids, next_token], dim=-1)
+            
+            # Clear cache periodically to manage memory
+            if use_cache and step % 500 == 0:
+                torch.cuda.empty_cache() if torch.cuda.is_available() else None
         
-        LOGGER.debug(f"Text generation completed: {generated_ids.size(1)} total tokens")
+        LOGGER.debug(f"Text generation completed: {generated_ids.size(1)} total tokens.")
         return generated_ids
 
     def _apply_repetition_penalty(self, 

@@ -42,8 +42,8 @@ class MetricsTracker:
         Initialize the MetricsTracker.
         
         Args:
-            metric_dir: Directory path for storing metrics files
-            metrics_file: Name of the metrics JSON file
+            metric_dir: Directory path for storing metrics files.
+            metrics_file: Name of the metrics JSON file.
         """
         self.losses: List[float] = []
         self.learning_rates: List[float] = []
@@ -68,11 +68,11 @@ class MetricsTracker:
         Add training metrics for current step.
         
         Args:
-            step: Current training step
-            epoch: Current epoch number
-            loss: Training loss value
-            lr: Current learning rate
-            grad_norm: Gradient norm value (optional)
+            step: Current training step.
+            epoch: Current epoch number.
+            loss: Training loss value.
+            lr: Current learning rate.
+            grad_norm: Gradient norm value (optional).
         """
         self.steps.append(step)
         self.epochs.append(epoch)
