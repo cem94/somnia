@@ -23,6 +23,7 @@ import time
 import math
 import torch
 import warnings
+import numpy as np
 from torch import optim, nn
 from contextlib import nullcontext
 from torch.utils.data import DataLoader
@@ -225,6 +226,8 @@ def train_model(model: SomniaTransformer, train_loader: DataLoader, tokenizer, c
             model.train()
             epoch_start_time = time.time()
             epoch_total_loss = 0.0
+            accumulate_loss = 0.0
+            accumulate_learning_rate = 0.0
             
             LOGGER.info(f"Starting epoch {current_epoch + 1}/{config.epochs}.")
             
@@ -241,6 +244,7 @@ def train_model(model: SomniaTransformer, train_loader: DataLoader, tokenizer, c
                 
                 # Update learning rate with cosine schedule
                 current_learning_rate = get_cosine_schedule_with_warmup(global_step, total_training_steps, config.learning_rate)
+                accumulate_learning_rate += current_learning_rate
                 optimizer.param_groups[0]['lr'] = current_learning_rate
 
                 # Forward pass with mixed precision
@@ -268,6 +272,7 @@ def train_model(model: SomniaTransformer, train_loader: DataLoader, tokenizer, c
                 
                 # Update best loss tracking BEFORE accumulation check
                 current_loss_value = masked_loss.item()
+                accumulate_loss += current_loss_value
                 if current_loss_value < best_loss:
                     best_loss = current_loss_value
                     LOGGER.debug(f"New best loss: {best_loss:.4f} at step {global_step}.")
@@ -289,10 +294,14 @@ def train_model(model: SomniaTransformer, train_loader: DataLoader, tokenizer, c
                     metrics_tracker.add_metrics(
                         step=global_step,
                         epoch=current_epoch,
-                        loss=current_loss_value,
-                        lr=current_learning_rate,
+                        loss=np.mean(accumulate_loss),
+                        lr=np.mean(accumulate_learning_rate),
                         grad_norm=gradient_norm.item() if torch.is_tensor(gradient_norm) else gradient_norm
                     )
+
+                    # Reset accumulators
+                    accumulate_loss = 0.0
+                    accumulate_learning_rate = 0.0
                 
                 global_step += 1
                 

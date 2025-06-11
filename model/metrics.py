@@ -143,23 +143,9 @@ class MetricsTracker:
             LOGGER.warning(f"Failed to load metrics from {self.metrics_file}: {e}")
             LOGGER.info("Initializing with empty metrics")
     
-    def _detect_training_interruptions(self) -> List[int]:
-        """
-        Detect training interruptions by finding gaps in step sequence.
-        
-        Returns:
-            List of indices where training was restarted
-        """
-        interruptions = []
-        for i in range(1, len(self.steps)):
-            # Consider a gap of more than 1 step as an interruption
-            if self.steps[i] - self.steps[i-1] > 1:
-                interruptions.append(i)
-        return interruptions
-    
     def plot_training_progress(self, save_path: str) -> None:
         """
-        Create comprehensive training plots with interruption markers.
+        Create comprehensive training plots.
         
         Args:
             save_path: Path where to save the combined plot
@@ -171,26 +157,16 @@ class MetricsTracker:
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
         fig.suptitle('Training Progress', fontsize=16, fontweight='bold')
         
-        # Detect training interruptions
-        interruptions = self._detect_training_interruptions()
-        
         # Plot 1: Loss over time
         ax1.plot(self.steps, self.losses, 'b-', linewidth=2, alpha=0.8, label='Training Loss')
-        for interrupt_idx in interruptions:
-            ax1.axvline(x=self.steps[interrupt_idx], color='red', linestyle='--', alpha=0.7, 
-                       label='Restart' if interrupt_idx == interruptions[0] else "")
         ax1.set_xlabel('Training Steps')
         ax1.set_ylabel('Loss')
         ax1.set_title('Training Loss')
         ax1.grid(True, alpha=0.3)
         ax1.set_yscale('log')
-        if interruptions:
-            ax1.legend()
         
         # Plot 2: Learning rate schedule
         ax2.plot(self.steps, self.learning_rates, 'r-', linewidth=2, alpha=0.8, label='Learning Rate')
-        for interrupt_idx in interruptions:
-            ax2.axvline(x=self.steps[interrupt_idx], color='red', linestyle='--', alpha=0.7)
         ax2.set_xlabel('Training Steps')
         ax2.set_ylabel('Learning Rate')
         ax2.set_title('Learning Rate Schedule')
@@ -199,8 +175,6 @@ class MetricsTracker:
         
         # Plot 3: Perplexity over time
         ax3.plot(self.steps, self.perplexities, 'g-', linewidth=2, alpha=0.8, label='Perplexity')
-        for interrupt_idx in interruptions:
-            ax3.axvline(x=self.steps[interrupt_idx], color='red', linestyle='--', alpha=0.7)
         ax3.set_xlabel('Training Steps')
         ax3.set_ylabel('Perplexity')
         ax3.set_title('Training Perplexity')
@@ -212,14 +186,6 @@ class MetricsTracker:
             # Handle case where gradient norms might be fewer than total steps
             grad_steps = self.steps[-len(self.grad_norms):]
             ax4.plot(grad_steps, self.grad_norms, 'purple', linewidth=2, alpha=0.8, label='Gradient Norm')
-            
-            # Add interruption markers for gradient norm plot
-            for interrupt_idx in interruptions:
-                if interrupt_idx >= len(self.steps) - len(self.grad_norms):
-                    grad_interrupt_idx = interrupt_idx - (len(self.steps) - len(self.grad_norms))
-                    if 0 <= grad_interrupt_idx < len(grad_steps):
-                        ax4.axvline(x=grad_steps[grad_interrupt_idx], color='red', linestyle='--', alpha=0.7)
-            
             ax4.set_xlabel('Training Steps')
             ax4.set_ylabel('Gradient Norm')
             ax4.set_title('Gradient Norm')
@@ -228,11 +194,6 @@ class MetricsTracker:
             ax4.text(0.5, 0.5, 'Gradient Norm\nNot Available', 
                     ha='center', va='center', transform=ax4.transAxes, fontsize=12)
             ax4.set_title('Gradient Norm')
-        
-        # Add restart information
-        if interruptions:
-            restart_text = f"Training restarted {len(interruptions)} time(s)"
-            fig.text(0.02, 0.02, restart_text, fontsize=10, style='italic', alpha=0.7)
         
         plt.tight_layout()
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
