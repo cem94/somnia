@@ -23,7 +23,6 @@ import time
 import math
 import torch
 import warnings
-import numpy as np
 from torch import optim, nn
 from contextlib import nullcontext
 from torch.utils.data import DataLoader
@@ -294,8 +293,8 @@ def train_model(model: SomniaTransformer, train_loader: DataLoader, tokenizer, c
                     metrics_tracker.add_metrics(
                         step=global_step,
                         epoch=current_epoch,
-                        loss=np.mean(accumulate_loss),
-                        lr=np.mean(accumulate_learning_rate),
+                        loss=accumulate_loss / config.accumulation_steps,
+                        lr=accumulate_learning_rate / config.accumulation_steps,
                         grad_norm=gradient_norm.item() if torch.is_tensor(gradient_norm) else gradient_norm
                     )
 
