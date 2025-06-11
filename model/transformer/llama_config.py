@@ -5,7 +5,7 @@ This module provides the configuration class for the transformer model,
 including all hyperparameters, training settings, and model architecture
 parameters.
 """
-
+import torch
 from transformers import PretrainedConfig
 from model.transformer.tokenizer_config import TokenizerConfig
 from utility.paths import TOKENIZER_DIR, OUTPUT_DIR, PLOT_OUTPUT_DIR, PROCESSED_OUTPUT_FILE
@@ -84,7 +84,7 @@ class LLamaConfig(PretrainedConfig):
                  save_interval: int = 500,
                  
                  # System parameters
-                 device: str = 'cpu'):
+                 device: str = None):
         """
         Initialize the LLaMA configuration.
 
@@ -139,7 +139,7 @@ class LLamaConfig(PretrainedConfig):
         self.save_interval = save_interval
         
         # Set system parameters
-        self.device = device
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
             
         self.dtype = "bfloat16"
         self.out_dir = OUTPUT_DIR
